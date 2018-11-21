@@ -1,0 +1,95 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\xlive">
+      <UniqueIdentifier>{3d8a5acb-6344-4cfa-822f-1bbc613ba831}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\xlln">
+      <UniqueIdentifier>{4d77f733-9359-4459-99a1-70e1273da435}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="main.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="xlln\DebugText.cpp">
+      <Filter>Source Files\xlln</Filter>
+    </ClCompile>
+    <ClCompile Include="xlln\xlln.cpp">
+      <Filter>Source Files\xlln</Filter>
+    </ClCompile>
+    <ClCompile Include="xlive\voice.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
+    <ClCompile Include="xlive\xlive.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
+    <ClCompile Include="xlive\xlocator.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
+    <ClCompile Include="xlive\xnet.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
+    <ClCompile Include="xlive\xnetqos.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
+    <ClCompile Include="xlive\xrender.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
+    <ClCompile Include="xlive\xsession.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
+    <ClCompile Include="xlive\xsocket.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="xlln\DebugText.h">
+      <Filter>Source Files\xlln</Filter>
+    </ClInclude>
+    <ClInclude Include="xlln\xlln.h">
+      <Filter>Source Files\xlln</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\voice.h">
+      <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\xdefs.h">
+      <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\xlive.h">
+      <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\xlocator.h">
+      <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\xnet.h">
+      <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\xrender.h">
+      <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\xsession.h">
+      <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\xsocket.h">
+      <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="xlive_exports.def">
+      <Filter>Source Files</Filter>
+    </None>
+  </ItemGroup>
+</Project>
