@@ -762,10 +762,15 @@ DWORD WINAPI XStringVerify(DWORD dwFlags, const CHAR *szLocale, DWORD dwNumStrin
 		return ERROR_INVALID_PARAMETER;
 	if (!pStringData)
 		return ERROR_INVALID_PARAMETER;
+	if (!pResults)
+		return ERROR_INVALID_PARAMETER;
 
-	pResults->wNumStrings = 0;
+	pResults->wNumStrings = dwNumStrings;
+	pResults->pStringResult = (HRESULT*)((BYTE*)pResults + sizeof(STRING_VERIFY_RESPONSE));
 
-	//TODO
+	for (int lcv = 0; lcv < dwNumStrings; lcv++)
+		pResults->pStringResult[lcv] = S_OK;
+	
 	if (pXOverlapped) {
 		//asynchronous
 
