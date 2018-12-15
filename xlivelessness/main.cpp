@@ -42,10 +42,12 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 		// Free all additional modules.
 		if (xlln_hinstLib) {
 			unsigned int i = xlln_hinstLib_len;
-			// Iterate backward and free all modules (in case order is important with undoing hooks for example).
-			do {
-				FreeLibrary(xlln_hinstLib[--xlln_hinstLib_len]);
-			} while (xlln_hinstLib_len > 0);
+			if (i) {
+				// Iterate backward and free all modules (in case order is important with undoing hooks for example).
+				do {
+					FreeLibrary(xlln_hinstLib[--i]);
+				} while (i > 0);
+			}
 			free(xlln_hinstLib);
 			xlln_hinstLib = NULL;
 			xlln_hinstLib_buflen = xlln_hinstLib_len = 0;
