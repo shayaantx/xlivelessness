@@ -3,36 +3,21 @@
 #include "DebugText.h"
 #include "../xlive/xdefs.h"
 #include "../xlive/xlive.h"
+#include "RandName.h"
+#include <string>
+#include <time.h>
 
 static LRESULT CALLBACK DLLWindowProc(HWND, UINT, WPARAM, LPARAM);
 
 static HINSTANCE xlln_hModule = NULL;
 HWND xlln_window_hwnd = NULL;
 static HMENU xlln_window_hMenu = NULL;
+static int xlln_instance = 0;
 
 static INT xlln_login_player = 0;
 static INT xlln_login_player_h[] = { MYMENU_LOGIN1, MYMENU_LOGIN2, MYMENU_LOGIN3, MYMENU_LOGIN4 };
 
-//Register the windows Class
-static BOOL RegisterDLLWindowClass(HINSTANCE hModule, wchar_t szClassName[])
-{
-	WNDCLASSEXW wc;
-	wc.hInstance = hModule;
-	wc.lpszClassName = (LPCWSTR)szClassName;
-	wc.lpfnWndProc = DLLWindowProc;
-	wc.style = CS_DBLCLKS;
-	wc.cbSize = sizeof(WNDCLASSEX);
-	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
-	wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
-	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-	wc.lpszMenuName = NULL;
-	wc.cbClsExtra = 0;
-	wc.cbWndExtra = 0;
-	wc.hbrBackground = (HBRUSH)COLOR_BACKGROUND;
-	if (!RegisterClassExW(&wc))
-		return FALSE;
-	return TRUE;
-}
+const BOOL xlln_debug = FALSE;
 
 static HMENU CreateDLLWindowMenu(HINSTANCE hModule)
 {
@@ -68,13 +53,32 @@ static HMENU CreateDLLWindowMenu(HINSTANCE hModule)
 
 static DWORD WINAPI ThreadProc(LPVOID lpParam)
 {
-	BOOL debug = TRUE;
+	srand((unsigned int)time(NULL));
+
+	const wchar_t* windowclassname = L"XLLNDLLWindowClass";
 	HINSTANCE hModule = reinterpret_cast<HINSTANCE>(lpParam);
 	xlln_window_hMenu = CreateDLLWindowMenu(hModule);
-	RegisterDLLWindowClass(hModule, L"XLLNDLLWindowClass");
+
+	// Register the windows Class.
+	WNDCLASSEXW wc;
+	wc.hInstance = hModule;
+	wc.lpszClassName = windowclassname;
+	wc.lpfnWndProc = DLLWindowProc;
+	wc.style = CS_DBLCLKS;
+	wc.cbSize = sizeof(WNDCLASSEX);
+	wc.hIcon = LoadIcon(NULL, IDI_APPLICATION);
+	wc.hIconSm = LoadIcon(NULL, IDI_APPLICATION);
+	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+	wc.lpszMenuName = NULL;
+	wc.cbClsExtra = 0;
+	wc.cbWndExtra = 0;
+	wc.hbrBackground = (HBRUSH)COLOR_BACKGROUND;
+	if (!RegisterClassExW(&wc))
+		return FALSE;
+
 	HWND hwdParent = NULL;// FindWindowW(L"Window Injected Into ClassName", L"Window Injected Into Caption");
-	xlln_window_hwnd = CreateWindowExW(0, L"XLLNDLLWindowClass", L"XLLN", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 400, 600, hwdParent, xlln_window_hMenu, hModule, NULL);
-	ShowWindow(xlln_window_hwnd, debug ? SW_NORMAL : SW_HIDE);
+	xlln_window_hwnd = CreateWindowExW(0, windowclassname, L"XLLN", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 400, xlln_debug ? 700 : 165, hwdParent, xlln_window_hMenu, hModule, NULL);
+	ShowWindow(xlln_window_hwnd, xlln_debug ? SW_NORMAL : SW_HIDE);
 
 	MSG msg;
 	while (GetMessage(&msg, NULL, 0, 0)) {
@@ -86,7 +90,72 @@ static DWORD WINAPI ThreadProc(LPVOID lpParam)
 			DispatchMessage(&msg);
 		}
 	}
-	return 1;
+	return TRUE;
+}
+
+
+// #41140
+DWORD WINAPI XLLNLogin(DWORD dwUserIndex, BOOL bLiveEnabled, DWORD dwUserId, const CHAR *szUsername)
+{
+	TRACE_FX();
+	if (dwUserIndex >= XLIVE_LOCAL_USER_COUNT)
+		return ERROR_NO_SUCH_USER;
+	if (szUsername && (!*szUsername || strlen(szUsername) > XUSER_MAX_NAME_LENGTH))
+		return ERROR_INVALID_ACCOUNT_NAME;
+	if (xlive_users_info[dwUserIndex]->UserSigninState != eXUserSigninState_NotSignedIn)
+		return ERROR_ALREADY_ASSIGNED;
+
+	if (!dwUserId) {
+		//Generate Random Number?
+		dwUserId = rand();
+	}
+	if (szUsername) {
+		strncpy_s(xlive_users_info[dwUserIndex]->szUserName, XUSER_NAME_SIZE, szUsername, XUSER_NAME_SIZE);
+	}
+	else {
+		wchar_t generated_name[XUSER_NAME_SIZE];
+		GetName(generated_name, XUSER_NAME_SIZE);
+		snprintf(xlive_users_info[dwUserIndex]->szUserName, XUSER_NAME_SIZE, "%ls", generated_name);
+	}
+
+	xlive_users_info[dwUserIndex]->UserSigninState = bLiveEnabled ? eXUserSigninState_SignedInToLive : eXUserSigninState_SignedInLocally;
+	//0x0009000000000000 - online xuid?
+	xlive_users_info[dwUserIndex]->xuid = 0xE000007300000000 + dwUserId;
+	xlive_users_info[dwUserIndex]->dwInfoFlags;
+
+	xlive_users_info_changed[dwUserIndex] = TRUE;
+
+	SetDlgItemText(xlln_window_hwnd, MYWINDOW_TBX_USERNAME, xlive_users_info[dwUserIndex]->szUserName);
+	CheckDlgButton(xlln_window_hwnd, MYWINDOW_CHK_LIVEENABLE, bLiveEnabled ? BST_CHECKED : BST_UNCHECKED);
+
+	BOOL checked = TRUE;//GetMenuState(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], 0) != MF_CHECKED;
+	CheckMenuItem(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], checked ? MF_CHECKED : MF_UNCHECKED);
+
+	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGIN), checked ? SW_HIDE : SW_SHOWNORMAL);
+	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGOUT), checked ? SW_SHOWNORMAL : SW_HIDE);
+
+	return ERROR_SUCCESS;
+}
+
+// #41141
+DWORD WINAPI XLLNLogout(DWORD dwUserIndex)
+{
+	TRACE_FX();
+	if (dwUserIndex >= XLIVE_LOCAL_USER_COUNT)
+		return ERROR_NO_SUCH_USER;
+	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
+		return ERROR_NOT_LOGGED_ON;
+
+	xlive_users_info[dwUserIndex]->UserSigninState = eXUserSigninState_NotSignedIn;
+	xlive_users_info_changed[dwUserIndex] = TRUE;
+
+	BOOL checked = FALSE;//GetMenuState(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], 0) != MF_CHECKED;
+	CheckMenuItem(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], checked ? MF_CHECKED : MF_UNCHECKED);
+
+	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGIN), checked ? SW_HIDE : SW_SHOWNORMAL);
+	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGOUT), checked ? SW_SHOWNORMAL : SW_HIDE);
+
+	return ERROR_SUCCESS;
 }
 
 static LRESULT CALLBACK DLLWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -139,30 +208,16 @@ static LRESULT CALLBACK DLLWindowProc(HWND hwnd, UINT message, WPARAM wParam, LP
 			BOOL checked = IsDlgButtonChecked(xlln_window_hwnd, MYWINDOW_CHK_LIVEENABLE) != BST_CHECKED;
 			CheckDlgButton(xlln_window_hwnd, MYWINDOW_CHK_LIVEENABLE, checked ? BST_CHECKED : BST_UNCHECKED);
 		}
-		else if (wParam == MYWINDOW_BTN_LOGIN || wParam == MYWINDOW_BTN_LOGOUT) {
+		else if (wParam == MYWINDOW_BTN_LOGIN) {
+			char jlbuffer[16];
+			GetDlgItemText(xlln_window_hwnd, MYWINDOW_TBX_USERNAME, jlbuffer, 16);
+			SetDlgItemText(xlln_window_hwnd, MYWINDOW_TBX_USERNAME, jlbuffer);
 
-			if (wParam == MYWINDOW_BTN_LOGIN) {
-				char jlbuffer[16];
-				GetDlgItemText(hwnd, MYWINDOW_TBX_USERNAME, jlbuffer, 16);
-				SetDlgItemText(hwnd, MYWINDOW_TBX_USERNAME, jlbuffer);
-
-				xlive_users_info[xlln_login_player]->UserSigninState = IsDlgButtonChecked(xlln_window_hwnd, MYWINDOW_CHK_LIVEENABLE) == BST_CHECKED ? eXUserSigninState_SignedInToLive : eXUserSigninState_SignedInLocally;
-				//0x0009000000000000 - online xuid?
-				xlive_users_info[xlln_login_player]->xuid = 0xE000007300000000 + xlln_login_player;
-				strncpy_s(xlive_users_info[xlln_login_player]->szUserName, XUSER_NAME_SIZE, jlbuffer, XUSER_NAME_SIZE);
-				xlive_users_info[xlln_login_player]->dwInfoFlags;
-			}
-			else {
-				xlive_users_info[xlln_login_player]->UserSigninState = eXUserSigninState_NotSignedIn;
-			}
-
-			xlive_users_info_changed[xlln_login_player] = TRUE;
-
-			BOOL checked = GetMenuState(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], 0) != MF_CHECKED;
-			CheckMenuItem(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], checked ? MF_CHECKED : MF_UNCHECKED);
-
-			ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGIN), checked ? SW_HIDE : SW_SHOWNORMAL);
-			ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGOUT), checked ? SW_SHOWNORMAL : SW_HIDE);
+			BOOL live_enabled = IsDlgButtonChecked(xlln_window_hwnd, MYWINDOW_CHK_LIVEENABLE) == BST_CHECKED;
+			DWORD result_login = XLLNLogin(xlln_login_player, live_enabled, NULL, strnlen_s(jlbuffer, 16) == 0 ? NULL : jlbuffer);
+		}
+		else if (wParam == MYWINDOW_BTN_LOGOUT) {
+			DWORD result_logout = XLLNLogout(xlln_login_player);
 		}
 		return 0;
 	}
@@ -176,11 +231,11 @@ static LRESULT CALLBACK DLLWindowProc(HWND hwnd, UINT message, WPARAM wParam, LP
 
 		HWND hWndControl;
 
-		CreateWindowA("edit", "Username", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP,
-			10, 10, 220, 22, hwnd, (HMENU)MYWINDOW_TBX_USERNAME, xlln_hModule, NULL);
+		CreateWindowA("edit", "", WS_CHILD | WS_VISIBLE | WS_BORDER | WS_TABSTOP,
+			10, 10, 260, 22, hwnd, (HMENU)MYWINDOW_TBX_USERNAME, xlln_hModule, NULL);
 
 		hWndControl = CreateWindowA("button", "Live Enabled", BS_CHECKBOX | WS_CHILD | WS_VISIBLE | WS_TABSTOP,
-			10, 40, 110, 22, hwnd, (HMENU)MYWINDOW_CHK_LIVEENABLE, xlln_hModule, NULL);
+			10, 40, 150, 22, hwnd, (HMENU)MYWINDOW_CHK_LIVEENABLE, xlln_hModule, NULL);
 
 		CreateWindowA("button", "Login", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
 			10, 70, 75, 25, hwnd, (HMENU)MYWINDOW_BTN_LOGIN, xlln_hModule, NULL);
@@ -188,8 +243,8 @@ static LRESULT CALLBACK DLLWindowProc(HWND hwnd, UINT message, WPARAM wParam, LP
 		CreateWindowA("button", "Logout", WS_CHILD | WS_TABSTOP,
 			10, 70, 75, 25, hwnd, (HMENU)MYWINDOW_BTN_LOGOUT, xlln_hModule, NULL);
 
-		hWndControl = CreateWindowA("edit", "output", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_MULTILINE | WS_SIZEBOX | WS_TABSTOP,
-			10, 120, 350, 400, hwnd, (HMENU)MYWINDOW_TBX_TEST, xlln_hModule, NULL);
+		hWndControl = CreateWindowA("edit", "", WS_CHILD | (xlln_debug ? WS_VISIBLE : 0) | WS_BORDER | ES_MULTILINE | WS_SIZEBOX | WS_TABSTOP | WS_HSCROLL,
+			10, 120, 350, 500, hwnd, (HMENU)MYWINDOW_TBX_TEST, xlln_hModule, NULL);
 
 	}
 	else if (message == WM_DESTROY) {
@@ -223,7 +278,20 @@ INT ShowXLLN(DWORD dwShowType)
 
 INT InitXLLN(HMODULE hModule)
 {
-	initDebugText();
+	wchar_t mutex_name[40];
+	DWORD mutex_last_error;
+	HANDLE mutex = NULL;
+	do {
+		if (mutex)
+			mutex_last_error = CloseHandle(mutex);
+		xlln_instance++;
+		swprintf(mutex_name, 40, L"Global\\XLLNInstance#%d", xlln_instance);
+		mutex = CreateMutexW(0, FALSE, mutex_name);
+		mutex_last_error = GetLastError();
+	} while (mutex_last_error != ERROR_SUCCESS);
+
+	if (xlln_debug)
+		initDebugText(xlln_instance);
 
 	xlln_hModule = hModule;
 	CreateThread(0, NULL, ThreadProc, (LPVOID)hModule, NULL, NULL);

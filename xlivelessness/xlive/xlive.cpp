@@ -1,11 +1,17 @@
+#include <winsock2.h>
 #include "xdefs.h"
 #include "../xlln/DebugText.h"
 #include "xlive.h"
 #include "xrender.h"
 #include "xnet.h"
 #include "../xlln/xlln.h"
+#include "xsocket.h"
 #include <time.h>
 #include <d3d9.h>
+#include <string>
+#include <vector>
+// Link with iphlpapi.lib
+#include <iphlpapi.h>
 
 BOOL xlive_users_info_changed[XLIVE_LOCAL_USER_COUNT];
 XUSER_SIGNIN_INFO* xlive_users_info[XLIVE_LOCAL_USER_COUNT];
@@ -22,6 +28,202 @@ static XSESSION_LOCAL_DETAILS xlive_session_details;
 static bool xlive_invite_to_game = false;
 
 static CRITICAL_SECTION d_lock;
+
+static char* xlive_preferred_network_adapter_name = NULL;
+EligibleAdapter xlive_network_adapter;
+
+INT GetNetworkAdapter()
+{
+	// Declare and initialize variables
+	DWORD dwRetVal = 0;
+
+	// Set the flags to pass to GetAdaptersAddresses
+	ULONG flags = GAA_FLAG_INCLUDE_PREFIX;
+
+	// IPv4
+	ULONG family = AF_INET;
+
+	PIP_ADAPTER_ADDRESSES pAddresses = NULL;
+	// Allocate a 15 KB buffer to start with.
+	ULONG outBufLen = 15000;
+	ULONG Iterations = 0;
+
+	PIP_ADAPTER_ADDRESSES pCurrAddresses = NULL;
+	PIP_ADAPTER_UNICAST_ADDRESS pUnicast = NULL;
+
+	INT result = ERROR_UNIDENTIFIED_ERROR;
+
+	do {
+		pAddresses = (IP_ADAPTER_ADDRESSES*)HeapAlloc(GetProcessHeap(), 0, (outBufLen));
+		if (pAddresses == NULL) {
+			addDebugText("Memory allocation failed for IP_ADAPTER_ADDRESSES struct");
+			dwRetVal = ERROR_NOT_ENOUGH_MEMORY;
+			break;
+		}
+
+		dwRetVal = GetAdaptersAddresses(family, flags, NULL, pAddresses, &outBufLen);
+
+		if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
+			HeapFree(GetProcessHeap(), 0, pAddresses);
+			pAddresses = NULL;
+		}
+		else {
+			break;
+		}
+
+		Iterations++;
+		// 3 attempts max
+	} while ((dwRetVal == ERROR_BUFFER_OVERFLOW) && (Iterations < 3));
+
+	if (dwRetVal == NO_ERROR) {
+		std::vector<EligibleAdapter*> eligible_adapters;
+
+		// If successful, output some information from the data we received
+		pCurrAddresses = pAddresses;
+		while (pCurrAddresses) {
+
+			if (pCurrAddresses->OperStatus == 1) {
+
+				//addDebugText("\tAdapter name: %s", pCurrAddresses->AdapterName);
+
+				pUnicast = pCurrAddresses->FirstUnicastAddress;
+				
+				for (int i = 0; pUnicast != NULL; i++)
+				{
+					if (pUnicast->Address.lpSockaddr->sa_family == AF_INET)
+					{
+						sockaddr_in *sa_in = (sockaddr_in *)pUnicast->Address.lpSockaddr;
+						ULONG dwMask = 0;
+						dwRetVal = ConvertLengthToIpv4Mask(pUnicast->OnLinkPrefixLength, &dwMask);
+						if (dwRetVal == NO_ERROR) {
+							EligibleAdapter *ea = new EligibleAdapter;
+							ea->name = pCurrAddresses->AdapterName;
+							ea->unicastHAddr = ntohl(((sockaddr_in *)pUnicast->Address.lpSockaddr)->sin_addr.s_addr);
+							ea->unicastHMask = ntohl(dwMask);
+							ea->minLinkSpeed = pCurrAddresses->ReceiveLinkSpeed;
+							if (pCurrAddresses->TransmitLinkSpeed < pCurrAddresses->ReceiveLinkSpeed)
+								ea->minLinkSpeed = pCurrAddresses->TransmitLinkSpeed;
+							ea->hasDnsServer = pCurrAddresses->FirstDnsServerAddress ? TRUE : FALSE;
+							eligible_adapters.push_back(ea);
+						}
+					}
+					pUnicast = pUnicast->Next;
+				}
+			}
+
+			pCurrAddresses = pCurrAddresses->Next;
+		}
+
+		EligibleAdapter* chosenAdapter = NULL;
+
+		for (EligibleAdapter* ea : eligible_adapters) {
+			if (xlive_preferred_network_adapter_name && strncmp(ea->name, xlive_preferred_network_adapter_name, 50) == 0) {
+				chosenAdapter = ea;
+				break;
+			}
+			if (ea->unicastHAddr == INADDR_LOOPBACK || ea->unicastHAddr == INADDR_BROADCAST || ea->unicastHAddr == INADDR_NONE)
+				continue;
+			if (!chosenAdapter) {
+				chosenAdapter = ea;
+				continue;
+			}
+			if ((ea->hasDnsServer && !chosenAdapter->hasDnsServer) ||
+				(ea->minLinkSpeed > chosenAdapter->minLinkSpeed)) {
+				chosenAdapter = ea;
+			}
+		}
+
+		if (chosenAdapter) {
+			memcpy_s(&xlive_network_adapter, sizeof(EligibleAdapter), chosenAdapter, sizeof(EligibleAdapter));
+			xlive_network_adapter.hBroadcast = ~(xlive_network_adapter.unicastHMask) | xlive_network_adapter.unicastHAddr;
+
+			unsigned int adapter_name_buflen = strnlen_s(chosenAdapter->name, 49) + 1;
+			xlive_network_adapter.name = (char*)malloc(adapter_name_buflen);
+			memcpy_s(xlive_network_adapter.name, adapter_name_buflen, chosenAdapter->name, adapter_name_buflen);
+			xlive_network_adapter.name[adapter_name_buflen - 1] = 0;
+
+			result = ERROR_SUCCESS;
+		}
+		else {
+			result = ERROR_NETWORK_UNREACHABLE;
+		}
+
+		for (EligibleAdapter* ea : eligible_adapters) {
+			delete ea;
+		}
+		eligible_adapters.clear();
+	}
+	else {
+		char errorMsg[400];
+		snprintf(errorMsg, 400, "Call to GetAdaptersAddresses failed with error: %d", dwRetVal);
+		addDebugText(errorMsg);
+		if (dwRetVal == ERROR_NO_DATA)
+			addDebugText("No addresses were found for the requested parameters");
+		else {
+			LPSTR lpMsgBuf = NULL;
+			if (FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+				FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+				NULL, dwRetVal, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+				// Default language
+				(LPSTR)&lpMsgBuf, 0, NULL)) {
+				snprintf(errorMsg, 400, "Error: %s", lpMsgBuf);
+				addDebugText(errorMsg);
+				LocalFree(lpMsgBuf);
+			}
+		}
+		result = ERROR_UNIDENTIFIED_ERROR;
+	}
+
+	if (pAddresses) {
+		HeapFree(GetProcessHeap(), 0, pAddresses);
+	}
+
+	if (result != ERROR_SUCCESS) {
+		xlive_network_adapter.name = NULL;
+		xlive_network_adapter.unicastHAddr = INADDR_LOOPBACK;
+		xlive_network_adapter.unicastHMask = 0;
+		xlive_network_adapter.hBroadcast = INADDR_BROADCAST;
+		xlive_network_adapter.hasDnsServer = FALSE;
+		xlive_network_adapter.minLinkSpeed = 0;
+	}
+
+	return result;
+}
+
+void CreateLocalUser()
+{
+	INT error_network_adapter = GetNetworkAdapter();
+
+	XNADDR *pAddr = &xlive_local_users[0].pxna;
+
+	unsigned long resolvedAddr;
+	if ((resolvedAddr = xlive_network_adapter.unicastHAddr) == INADDR_NONE) {//inet_addr("192.168.0.6")
+		return;
+	}
+
+	//DWORD user_id = 0x6061B52F;
+	DWORD user_id = rand();
+	DWORD mac_fix = 0x00131000;
+
+	pAddr->ina.s_addr = htonl(resolvedAddr);
+	pAddr->wPortOnline = htons(xlive_base_port);
+	pAddr->inaOnline.s_addr = user_id << 8;
+
+	memset(&(pAddr->abEnet), 0, 6);
+	memset(&(pAddr->abOnline), 0, 6);
+
+	memcpy(&(pAddr->abEnet), &user_id, 4);
+	memcpy(&(pAddr->abOnline), &user_id, 4);
+
+	memcpy((BYTE*)&(pAddr->abEnet) + 3, (BYTE*)&mac_fix + 1, 3);
+	memcpy((BYTE*)&(pAddr->abOnline) + 17, (BYTE*)&mac_fix + 1, 3);
+
+	xlive_local_users[0].pina.s_addr = pAddr->inaOnline.s_addr;
+
+	xlive_local_users[0].bValid = TRUE;
+
+	//CreateUser(pAddr, TRUE);
+}
 
 
 void Check_Overlapped(PXOVERLAPPED pOverlapped)
@@ -168,6 +370,15 @@ HRESULT WINAPI XLiveInitialize(XLIVE_INITIALIZE_INFO *pPii)
 
 	srand((unsigned int)time(NULL));
 
+	if (pPii->pszAdapterName && pPii->pszAdapterName[0]) {
+		unsigned int adapter_name_buflen = strnlen_s(pPii->pszAdapterName, 49) + 1;
+		xlive_preferred_network_adapter_name = (char*)malloc(adapter_name_buflen);
+		memcpy_s(xlive_preferred_network_adapter_name, adapter_name_buflen, pPii->pszAdapterName, adapter_name_buflen);
+		xlive_preferred_network_adapter_name[adapter_name_buflen-1] = 0;
+	}
+
+	memset(&xlive_network_adapter, 0x00, sizeof(EligibleAdapter));
+
 	for (int i = 0; i < XLIVE_LOCAL_USER_COUNT; i++) {
 		xlive_users_info[i] = (XUSER_SIGNIN_INFO*)malloc(sizeof(XUSER_SIGNIN_INFO));
 		memset(xlive_users_info[i], 0, sizeof(XUSER_SIGNIN_INFO));
@@ -176,8 +387,30 @@ HRESULT WINAPI XLiveInitialize(XLIVE_INITIALIZE_INFO *pPii)
 
 	memset(&xlive_session_details, 0, sizeof(XSESSION_LOCAL_DETAILS));
 
-
 	InitializeCriticalSection(&d_lock);
+
+	wchar_t mutex_name[40];
+	DWORD mutex_last_error;
+	HANDLE mutex = NULL;
+	do {
+		if (mutex)
+			mutex_last_error = CloseHandle(mutex);
+		xlive_base_port += 1000;
+		if (xlive_base_port > 65000) {
+			xlive_netsocket_abort = TRUE;
+			xlive_base_port = 1000;
+			break;
+		}
+		swprintf(mutex_name, 40, L"Global\\XLLNBasePort#%hd", xlive_base_port);
+		mutex = CreateMutexW(0, TRUE, mutex_name);
+		mutex_last_error = GetLastError();
+	} while (mutex_last_error != ERROR_SUCCESS);
+
+	char debugText[50];
+	snprintf(debugText, 50, "XLive Base Port %hd.", xlive_base_port);
+	addDebugText(debugText);
+
+	CreateLocalUser();
 
 	//TODO If the title's graphics system has not yet been initialized, D3D will be passed in XLiveOnCreateDevice(...).
 	INT error_XRender = InitXRender(pPii);
@@ -303,6 +536,15 @@ HRESULT WINAPI XLiveUpdateSystem(LPCWSTR lpszRelaunchCmdLine)
 	return S_OK;
 	// No update?
 	return S_FALSE;
+}
+
+// #5026
+HRESULT WINAPI XLiveSetSponsorToken(LPCWSTR pwszToken, DWORD dwTitleId)
+{
+	TRACE_FX();
+	if (!pwszToken || wcsnlen_s(pwszToken, 30) != 29)
+		return E_INVALIDARG;
+	return S_OK;
 }
 
 // #5028
@@ -445,6 +687,95 @@ DWORD WINAPI XEnumerate(HANDLE hEnum, PVOID pvBuffer, DWORD cbBuffer, PDWORD pcI
 		//return result;
 	}
 	return ERROR_SUCCESS;
+}
+
+// #5257
+HRESULT WINAPI XLiveManageCredentials(LPCWSTR lpszLiveIdName, LPCWSTR lpszLiveIdPassword, DWORD dwCredFlags, PXOVERLAPPED pXOverlapped)
+{
+	TRACE_FX();
+	if (dwCredFlags & XLMGRCREDS_FLAG_SAVE && dwCredFlags & XLMGRCREDS_FLAG_DELETE || !(dwCredFlags & XLMGRCREDS_FLAG_SAVE) && !(dwCredFlags & XLMGRCREDS_FLAG_DELETE))
+		return E_INVALIDARG;
+	if (!lpszLiveIdName || !*lpszLiveIdName)
+		return E_INVALIDARG;
+	if (dwCredFlags & XLMGRCREDS_FLAG_SAVE && (!lpszLiveIdPassword || !*lpszLiveIdPassword))
+		return E_INVALIDARG;
+
+	//TODO
+	if (pXOverlapped) {
+		//asynchronous
+
+		pXOverlapped->InternalLow = ERROR_SUCCESS;
+		pXOverlapped->InternalHigh = ERROR_SUCCESS;
+		pXOverlapped->dwExtendedError = ERROR_SUCCESS;
+
+		Check_Overlapped(pXOverlapped);
+
+		return ERROR_IO_PENDING;
+	}
+	else {
+		//synchronous
+		//return result;
+	}
+	return S_OK;
+}
+
+// #5258
+HRESULT WINAPI XLiveSignout(PXOVERLAPPED  pXOverlapped)
+{
+	TRACE_FX();
+
+	XLLNLogout(0);
+
+	if (pXOverlapped) {
+		//asynchronous
+
+		pXOverlapped->InternalLow = ERROR_SUCCESS;
+		pXOverlapped->InternalHigh = ERROR_SUCCESS;
+		pXOverlapped->dwExtendedError = ERROR_SUCCESS;
+
+		Check_Overlapped(pXOverlapped);
+
+		return ERROR_IO_PENDING;
+	}
+	else {
+		//synchronous
+		//return result;
+	}
+	return S_OK;
+}
+
+// #5259
+HRESULT WINAPI XLiveSignin(PWSTR pszLiveIdName, PWSTR pszLiveIdPassword, DWORD dwFlags, PXOVERLAPPED pXOverlapped)
+{
+	TRACE_FX();
+	if (!pszLiveIdName || !*pszLiveIdName)
+		return E_INVALIDARG;
+	if (!pszLiveIdPassword || !*pszLiveIdPassword)
+		return E_INVALIDARG;
+
+	if (dwFlags & XLSIGNIN_FLAG_SAVECREDS) {
+
+	}
+	//XLSIGNIN_FLAG_ALLOWTITLEUPDATES XLSIGNIN_FLAG_ALLOWSYSTEMUPDATES
+
+	XLLNLogin(0, FALSE, 0, 0);
+
+	if (pXOverlapped) {
+		//asynchronous
+
+		pXOverlapped->InternalLow = ERROR_SUCCESS;
+		pXOverlapped->InternalHigh = ERROR_SUCCESS;
+		pXOverlapped->dwExtendedError = ERROR_SUCCESS;
+
+		Check_Overlapped(pXOverlapped);
+
+		return ERROR_IO_PENDING;
+	}
+	else {
+		//synchronous
+		//return result;
+	}
+	return S_OK;
 }
 
 // #5260
@@ -765,10 +1096,10 @@ DWORD WINAPI XStringVerify(DWORD dwFlags, const CHAR *szLocale, DWORD dwNumStrin
 	if (!pResults)
 		return ERROR_INVALID_PARAMETER;
 
-	pResults->wNumStrings = dwNumStrings;
+	pResults->wNumStrings = (WORD)dwNumStrings;
 	pResults->pStringResult = (HRESULT*)((BYTE*)pResults + sizeof(STRING_VERIFY_RESPONSE));
 
-	for (int lcv = 0; lcv < dwNumStrings; lcv++)
+	for (int lcv = 0; lcv < (WORD)dwNumStrings; lcv++)
 		pResults->pStringResult[lcv] = S_OK;
 	
 	if (pXOverlapped) {
@@ -902,12 +1233,12 @@ DWORD WINAPI XInviteGetAcceptedInfo(DWORD dwUserIndex, XINVITE_INFO *pInfo)
 	if (xlive_invite_to_game) {
 		xlive_invite_to_game = false;
 		unsigned long resolvedAddr;
-		if ((resolvedAddr = inet_addr("27.42.76.45")) == INADDR_NONE) {
+		if ((resolvedAddr = inet_addr("10.0.0.20")) == INADDR_NONE) {
 			return ERROR;
 		}
 
 		pInfo->hostInfo.hostAddress.ina.s_addr = resolvedAddr;
-		pInfo->hostInfo.hostAddress.wPortOnline = 2000;
+		pInfo->hostInfo.hostAddress.wPortOnline = htons(2000);
 
 		XUID host_xuid = 1234561000000032;
 		pInfo->hostInfo.hostAddress.inaOnline.s_addr = 8192;

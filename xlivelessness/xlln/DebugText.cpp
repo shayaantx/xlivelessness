@@ -2,6 +2,7 @@
 #include "DebugText.h"
 #include <string>
 #include "../xlln/xlln.h"
+#include "../xlive/xsocket.h"
 
 
 static char** DebugStr;
@@ -11,8 +12,8 @@ static bool DebugTextDisplay = false;
 static FILE* debugFile = NULL;
 static bool initialisedDebugText = false;
 
-static const int blacklistlen = 9;
-static const char* blacklist[blacklistlen] = { "XLiveRender", "XNetGetEthernetLinkStatus", "XLiveInput", "XLivePreTranslateMessage", "XLivePBufferGetByte", "XSocketWSAGetLastError", "XSocketRecvFrom", "XNotifyGetNext", "XUserCheckPrivilege" };
+static const int blacklistlen = 11;
+static const char* blacklist[blacklistlen] = { "XLiveRender", "XNetGetEthernetLinkStatus", "XLiveInput", "XLivePreTranslateMessage", "XLivePBufferGetByte", "XSocketWSAGetLastError", "XSocketRecvFrom", "XNotifyGetNext", "XUserCheckPrivilege", "XNetGetConnectStatus", "XSocketHTONL" };
 
 
 int getDebugTextArrayMaxLen() {
@@ -79,7 +80,7 @@ void addDebugText(char* text) {
 	LeaveCriticalSection(&log_section);
 }
 
-void initDebugText() {
+void initDebugText(DWORD dwInstanceId) {
 	InitializeCriticalSection(&log_section);
 	initialisedDebugText = true;
 	DebugStr = (char**)malloc(sizeof(char*) * DebugTextArrayLenMax);
@@ -87,7 +88,7 @@ void initDebugText() {
 		DebugStr[i] = (char*)calloc(1, sizeof(char));
 	}
 	wchar_t debug_file_path[1024];
-	swprintf(debug_file_path, 1024, L"%wsxlln_debug.log", L"./");
+	swprintf(debug_file_path, 1024, L"%wsxlln_debug_%d.log", L"./", dwInstanceId);
 	debugFile = _wfopen(debug_file_path, L"w");
 	char awerg[1034];
 	sprintf(awerg, "PATH: %ws", debug_file_path);
@@ -122,6 +123,8 @@ bool getDebugTextDisplay() {
 //GetLocalTime(&t);
 //fwprintf(log_handle, L"%02d/%02d/%04d %02d:%02d:%02d.%03d ", t.wDay, t.wMonth, t.wYear, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 
+static char debug_blarg[1000];
+
 void trace_func(const char *fxname)
 {
 	for (int i = 0; i < blacklistlen; i++) {
@@ -134,7 +137,13 @@ void trace_func(const char *fxname)
 	addDebugText(guibsig);
 	free(guibsig);
 
-	SetDlgItemText(xlln_window_hwnd, MYWINDOW_TBX_TEST, getDebugText(0));
+	if (xlln_debug) {
+		char* iblarg = debug_blarg;
+		for (int i = 0; i < 30; i++) {
+			iblarg += snprintf(iblarg, 1000, "%s\r\n", getDebugText(i));
+		}
+		SetDlgItemText(xlln_window_hwnd, MYWINDOW_TBX_TEST, debug_blarg);
+	}
 	/*if (getDebugTextDisplay()) {
 		for (int i = 0; i < getDebugTextArrayMaxLen(); i++) {
 			const char* text = getDebugText(i);

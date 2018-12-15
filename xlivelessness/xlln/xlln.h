@@ -17,8 +17,11 @@
 #define MYWINDOW_CHK_LIVEENABLE   (WM_APP + 123)
 #define MYWINDOW_BTN_LOGOUT   (WM_APP + 124)
 
+DWORD WINAPI XLLNLogin(DWORD dwUserIndex, BOOL bLiveEnabled, DWORD dwUserId, const CHAR *szUsername);
+DWORD WINAPI XLLNLogout(DWORD dwUserIndex);
 INT InitXLLN(HMODULE hModule);
 INT UninitXLLN();
 INT ShowXLLN(DWORD dwShowType);
 
 extern HWND xlln_window_hwnd;
+extern const BOOL xlln_debug;

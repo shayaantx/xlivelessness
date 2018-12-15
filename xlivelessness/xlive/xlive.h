@@ -6,3 +6,14 @@ extern BOOL xlive_users_info_changed[XLIVE_LOCAL_USER_COUNT];
 extern XUSER_SIGNIN_INFO* xlive_users_info[XLIVE_LOCAL_USER_COUNT];
 
 void Check_Overlapped(PXOVERLAPPED pOverlapped);
+
+struct EligibleAdapter {
+	char* name;
+	ULONG unicastHAddr;
+	ULONG unicastHMask;
+	ULONG hBroadcast;
+	UINT64 minLinkSpeed;
+	BOOL hasDnsServer;
+};
+
+extern EligibleAdapter xlive_network_adapter;

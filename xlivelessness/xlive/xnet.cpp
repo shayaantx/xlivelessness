@@ -5,6 +5,45 @@
 
 BOOL xlive_net_initialized = FALSE;
 
+CLocalUser xlive_local_users[16];
+
+std::map<DWORD, XNADDR*> xlive_users_secure;
+std::map<std::pair<DWORD, WORD>, XNADDR*> xlive_users_hostpair;
+
+
+VOID CreateUser(XNADDR* pxna)
+{
+	TRACE_FX();
+
+	DWORD secure = pxna->inaOnline.s_addr;
+	XNADDR* userPxna = xlive_users_secure.count(secure) ? xlive_users_secure[secure] : NULL;
+	if (userPxna)
+		delete userPxna;
+
+	userPxna = new XNADDR;
+	memset(userPxna, 0x00, sizeof(XNADDR));
+	memcpy(userPxna, pxna, sizeof(XNADDR));
+
+	xlive_users_secure[secure] = userPxna;
+
+	std::pair<DWORD, WORD> hostpair = std::make_pair(ntohl(pxna->ina.s_addr), ntohs(pxna->wPortOnline));
+	xlive_users_hostpair[hostpair] = userPxna;
+}
+
+void UnregisterSecureAddr(const IN_ADDR ina)
+{
+	return;
+	CLocalUser* deluser = NULL;// xlive_cUsers.count(ina.s_addr) ? xlive_cUsers[ina.s_addr] : NULL;
+	//xlive_cUsers.erase(ina.s_addr);
+
+
+	if (deluser != 0)
+	{
+
+	}
+}
+
+
 // #51
 INT WINAPI XNetStartup(const XNetStartupParams *pxnsp)
 {
@@ -13,7 +52,8 @@ INT WINAPI XNetStartup(const XNetStartupParams *pxnsp)
 		if (pxnsp->cfgSizeOfStruct != sizeof(XNetStartupParams))
 			return ERROR_INVALID_PARAMETER;
 	}
-	xlive_net_initialized = TRUE;
+	if (!xlive_netsocket_abort)
+		xlive_net_initialized = TRUE;
 	if (!xlive_net_initialized)
 		return ERROR_FUNCTION_FAILED;
 	return ERROR_SUCCESS;
@@ -52,7 +92,7 @@ HRESULT WINAPI XNetCreateKey(XNKID *pxnkid, XNKEY *pxnkey)
 	//memset(pxnkid, 0xAB, sizeof(XNKID));
 	memset(pxnkey, 0XAA, sizeof(XNKEY));
 
-	/* These are un-necessary. */
+	// These are un-necessary.
 	//pxnkid->ab[0] &= ~XNET_XNKID_MASK;
 	//pxnkid->ab[0] |= XNET_XNKID_SYSTEM_LINK;
 	
@@ -79,6 +119,8 @@ INT WINAPI XNetXnAddrToInAddr(XNADDR *pxna, XNKID *pnkid, IN_ADDR *pina)
 	TRACE_FX();
 	ULONG secure = pxna->inaOnline.s_addr;
 
+	CreateUser(pxna);
+
 	if (secure != 0) {
 		pina->s_addr = secure;
 	}
@@ -94,13 +136,14 @@ INT WINAPI XNetXnAddrToInAddr(XNADDR *pxna, XNKID *pnkid, IN_ADDR *pina)
 INT WINAPI XNetInAddrToXnAddr(const IN_ADDR ina, XNADDR *pxna, XNKID *pxnkid)
 {
 	TRACE_FX();
-	void* user = NULL;
+
+	XNADDR* userPxna = xlive_users_secure.count(ina.s_addr) ? xlive_users_secure[ina.s_addr] : NULL;
 
 	// Zero memory of the current buffer passed to us by the game.
 	memset(pxna, 0x00, sizeof(XNADDR));
 
-	if (user != 0) {
-		//memcpy(pxna, &user->pxna, sizeof(XNADDR));
+	if (userPxna != 0) {
+		memcpy(pxna, userPxna, sizeof(XNADDR));
 	}
 	else {
 		__debugbreak();
@@ -113,6 +156,7 @@ INT WINAPI XNetInAddrToXnAddr(const IN_ADDR ina, XNADDR *pxna, XNKID *pxnkid)
 INT WINAPI XNetUnregisterInAddr(const IN_ADDR ina)
 {
 	TRACE_FX();
+	UnregisterSecureAddr(ina);
 	return S_OK;
 }
 
@@ -132,37 +176,6 @@ INT WINAPI XNetGetConnectStatus(const IN_ADDR ina)
 	return XNET_CONNECT_STATUS_CONNECTED;
 }
 
-void sfdsagf(XNADDR *pAddr) {
-
-	//BYTE blarg[] = {0x7C,0xBA,0x6C,0x6A,0x00,0x01,0x00,0x00,0x07,0xD0,0x01,0x00,0x00,0x10,0x13,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x10,0x13,0x00};
-
-	//memcpy(pAddr, blarg, sizeof(XNADDR));
-
-	//return;
-
-	unsigned long resolvedAddr;
-	if ((resolvedAddr = inet_addr("127.0.0.1")) == INADDR_NONE) {
-		return;
-	}
-	XUID host_xuid = 0xE000007300000000;
-
-	DWORD user_id = 0x6061B52F;
-	DWORD mac_fix = 0x00131000;
-
-	pAddr->ina.s_addr = resolvedAddr;
-	pAddr->wPortOnline = 2000;
-	pAddr->inaOnline.s_addr = 8192;
-
-	memset(&(pAddr->abEnet), 0, 6);
-	memset(&(pAddr->abOnline), 0, 6);
-
-	memcpy(&(pAddr->abEnet), &user_id, 4);
-	memcpy(&(pAddr->abOnline), &user_id, 4);
-
-	memcpy((BYTE*)&(pAddr->abEnet) + 3, (BYTE*)&mac_fix + 1, 3);
-	memcpy((BYTE*)&(pAddr->abOnline) + 17, (BYTE*)&mac_fix + 1, 3);
-}
-
 // #73
 DWORD WINAPI XNetGetTitleXnAddr(XNADDR *pAddr)
 {
@@ -170,7 +183,7 @@ DWORD WINAPI XNetGetTitleXnAddr(XNADDR *pAddr)
 	if (!xlive_net_initialized)
 		return XNET_GET_XNADDR_PENDING;
 	if (pAddr) {
-		sfdsagf(pAddr);
+		memcpy(pAddr, &xlive_local_users[0].pxna, sizeof(xlive_local_users[0].pxna));
 	}
 	return XNET_GET_XNADDR_STATIC | XNET_GET_XNADDR_ETHERNET;
 }
@@ -188,9 +201,8 @@ DWORD WINAPI XNetGetEthernetLinkStatus()
 INT WINAPI XNetSetSystemLinkPort(WORD wSystemLinkPort)
 {
 	TRACE_FX();
-	//network byte (big-endian) to little-endian
-	//WORD port = (((BYTE*)&wSystemLinkPort)[1] << 0) | (((BYTE*)&wSystemLinkPort)[0] << 8);
-	WORD port = ntohs(wSystemLinkPort);
+	//network byte (big-endian) to little-endian host
+	WORD hPort = ntohs(wSystemLinkPort);
 
 	return ERROR_SUCCESS;
 }

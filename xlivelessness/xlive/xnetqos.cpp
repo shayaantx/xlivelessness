@@ -8,7 +8,6 @@ INT WINAPI XNetQosListen(XNKID *pxnkid, PBYTE pb, UINT cb, DWORD dwBitsPerSec, D
 	TRACE_FX();
 	return ERROR_FUNCTION_FAILED;
 	//DO STUFF
-
 	return S_OK;
 }
 
@@ -16,8 +15,8 @@ INT WINAPI XNetQosListen(XNKID *pxnkid, PBYTE pb, UINT cb, DWORD dwBitsPerSec, D
 DWORD WINAPI XNetQosLookup(UINT cxna, XNADDR * apxna[], XNKID * apxnkid[], XNKEY * apxnkey[], UINT cina, IN_ADDR aina[], DWORD adwServiceId[], UINT cProbes, DWORD dwBitsPerSec, DWORD dwFlags, WSAEVENT hEvent, XNQOS** pxnqos)
 {
 	TRACE_FX();
-	return ERROR_FUNCTION_FAILED;
-
+	//return ERROR_FUNCTION_FAILED;
+	/*
 	//void ClientQoSLookUp(UINT cxna, XNADDR* apxna[],UINT cProbes,IN_ADDR  aina[], XNQOS** pxnqos,DWORD dwBitsPerSec)
 
 	//XNADDR **axpna_copy = (XNADDR**)malloc(cxna * sizeof(XNADDR*));
@@ -45,7 +44,7 @@ DWORD WINAPI XNetQosLookup(UINT cxna, XNADDR * apxna[], XNKID * apxnkid[], XNKEY
 	pqos->axnqosinfo[0].bFlags = XNET_XNQOSINFO_TARGET_CONTACTED | XNET_XNQOSINFO_COMPLETE;
 
 
-
+	*/
 	/*
 	This is gonna hit some CPUs hard when there's a lot of servers on the list, we'll probably want to queue this a bit and only allow X number of threads to run at a time.
 	We want to abuse the CPU where possible considering more modern systems will have decent CPUs so we'll be able to force things to happen faster but still want to keep compatibility with older setups.
@@ -55,7 +54,7 @@ DWORD WINAPI XNetQosLookup(UINT cxna, XNADDR * apxna[], XNKID * apxnkid[], XNKEY
 
 
 	/* Memory Leak  - FIX ME! (Need to do some kind of garbage collection somewhere and store data like this in an array to be cleared later */
-	/*
+	
 	*pxnqos = new XNQOS;
 	XNQOS* pqos = *pxnqos;
 	pqos->cxnqos = 1;
@@ -81,7 +80,7 @@ DWORD WINAPI XNetQosLookup(UINT cxna, XNADDR * apxna[], XNKID * apxnkid[], XNKEY
 	pqos->axnqosinfo->dwDnBitsPerSec = dwBitsPerSec;
 	pqos->axnqosinfo->bFlags = XNET_XNQOSINFO_TARGET_CONTACTED | XNET_XNQOSINFO_COMPLETE;
 
-	}*/
+	}
 
 	return S_OK;
 }
@@ -90,7 +89,8 @@ DWORD WINAPI XNetQosLookup(UINT cxna, XNADDR * apxna[], XNKID * apxnkid[], XNKEY
 INT WINAPI XNetQosRelease(XNQOS* pxnqos)
 {
 	TRACE_FX();
-	return ERROR_FUNCTION_FAILED;
+	return S_OK;
+	//return ERROR_FUNCTION_FAILED;
 	for (unsigned int i = 0; i == pxnqos->cxnqos; i++)
 	{
 		if (pxnqos->axnqosinfo[i].cbData > 0)

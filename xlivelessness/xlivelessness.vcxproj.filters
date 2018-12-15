@@ -54,6 +54,9 @@
     <ClCompile Include="xlive\xsocket.cpp">
       <Filter>Source Files\xlive</Filter>
     </ClCompile>
+    <ClCompile Include="xlln\RandName.cpp">
+      <Filter>Source Files\xlln</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="xlln\DebugText.h">
@@ -85,6 +88,9 @@
     </ClInclude>
     <ClInclude Include="xlive\xsocket.h">
       <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+    <ClInclude Include="xlln\RandName.h">
+      <Filter>Source Files\xlln</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

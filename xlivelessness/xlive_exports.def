@@ -58,6 +58,7 @@ EXPORTS
 	XLivePBufferSetByte @5019
 	XLiveGetUpdateInformation @5022
 	XLiveUpdateSystem @5024
+	XLiveSetSponsorToken @5026
 	XLiveLoadLibraryEx @5028
 	XLiveFreeLibrary @5029
 	XLivePreTranslateMessage @5030
@@ -74,6 +75,9 @@ EXPORTS
 	XShowGamerCardUI @5252
 	XCancelOverlapped @5254
 	XEnumerate @5256
+	XLiveManageCredentials @5257
+	XLiveSignout @5258
+	XLiveSignin @5259
 	XShowSigninUI @5260
 	XUserGetXUID @5261
 	XUserGetSigninState @5262
@@ -103,3 +107,5 @@ EXPORTS
 	XStorageBuildServerPath @5344
 	XStorageDownloadToMemory @5345
 	
+	XLLNLogin @41140
+	XLLNLogout @41141
