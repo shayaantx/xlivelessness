@@ -144,6 +144,7 @@
     <None Include="xlive_exports.def" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="resource.h" />
     <ClInclude Include="xlive\voice.h" />
     <ClInclude Include="xlive\xdefs.h" />
     <ClInclude Include="xlive\xlive.h" />
@@ -155,6 +156,9 @@
     <ClInclude Include="xlln\DebugText.h" />
     <ClInclude Include="xlln\RandName.h" />
     <ClInclude Include="xlln\xlln.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="xlive.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
