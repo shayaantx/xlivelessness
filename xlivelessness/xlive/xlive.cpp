@@ -6,6 +6,7 @@
 #include "xnet.h"
 #include "../xlln/xlln.h"
 #include "xsocket.h"
+#include "xlocator.h"
 #include <time.h>
 #include <d3d9.h>
 #include <string>
@@ -350,6 +351,7 @@ DWORD WINAPI XGetOverlappedResult(PXOVERLAPPED pOverlapped, LPDWORD pdwResult, B
 	TRACE_FX();
 	if (bWait) {
 		while (pOverlapped->InternalLow == ERROR_IO_INCOMPLETE) {
+			Sleep(50L);
 		}
 	}
 
@@ -626,6 +628,9 @@ BOOL WINAPI XCloseHandle(HANDLE hObject)
 		SetLastError(ERROR_INVALID_PARAMETER);
 		return FALSE;
 	}
+	if (xlive_xlocator_enumerators.count(hObject)) {
+		xlive_xlocator_enumerators.erase(hObject);
+	}
 	if (!CloseHandle(hObject)) {
 		SetLastError(ERROR_INVALID_HANDLE);
 		return FALSE;
@@ -651,7 +656,7 @@ DWORD WINAPI XCancelOverlapped(PXOVERLAPPED pOverlapped)
 	TRACE_FX();
 	if (!pOverlapped)
 		return ERROR_INVALID_PARAMETER;
-	//TODO
+	//TODO XCancelOverlapped
 	return ERROR_SUCCESS;
 }
 
@@ -670,7 +675,49 @@ DWORD WINAPI XEnumerate(HANDLE hEnum, PVOID pvBuffer, DWORD cbBuffer, PDWORD pcI
 	if (!pcItemsReturned && !pXOverlapped)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	if (xlive_xlocator_enumerators.count(hEnum)) {
+		xlive_xlocator_enumerators[hEnum];
+
+		DWORD max_result_len = cbBuffer / sizeof(XLOCATOR_SEARCHRESULT);
+		DWORD total_server_count = 0;
+
+		EnterCriticalSection(&liveoverlan_sessions_lock);
+		for (auto const &session : liveoverlan_sessions) {
+			if (total_server_count >= max_result_len)
+				break;
+			if (std::find(xlive_xlocator_enumerators[hEnum].begin(), xlive_xlocator_enumerators[hEnum].end(), session.first) != xlive_xlocator_enumerators[hEnum].end())
+				continue;
+			XLOCATOR_SEARCHRESULT* server = &((XLOCATOR_SEARCHRESULT*)pvBuffer)[total_server_count++];
+			xlive_xlocator_enumerators[hEnum].push_back(session.first);
+			LiveOverLanClone(&server, session.second->searchresult);
+		}
+		LeaveCriticalSection(&liveoverlan_sessions_lock);
+
+		if (pXOverlapped) {
+			//pXOverlapped->InternalHigh = ERROR_IO_INCOMPLETE;
+			//pXOverlapped->InternalLow = ERROR_IO_INCOMPLETE;
+			//pXOverlapped->dwExtendedError = ERROR_SUCCESS;
+
+			if (total_server_count) {
+				pXOverlapped->InternalHigh = total_server_count;
+				pXOverlapped->InternalLow = ERROR_SUCCESS;
+			}
+			else {
+				pXOverlapped->InternalHigh = ERROR_SUCCESS;
+				pXOverlapped->InternalLow = ERROR_NO_MORE_FILES;
+				XCloseHandle(hEnum);
+			}
+			Check_Overlapped(pXOverlapped);
+
+			return ERROR_IO_PENDING;
+		}
+		else {
+			*pcItemsReturned = total_server_count;
+			return ERROR_SUCCESS;
+		}
+	}
+
+	//TODO XEnumerate
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -700,7 +747,7 @@ HRESULT WINAPI XLiveManageCredentials(LPCWSTR lpszLiveIdName, LPCWSTR lpszLiveId
 	if (dwCredFlags & XLMGRCREDS_FLAG_SAVE && (!lpszLiveIdPassword || !*lpszLiveIdPassword))
 		return E_INVALIDARG;
 
-	//TODO
+	//TODO XLiveManageCredentials
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -792,7 +839,7 @@ DWORD WINAPI XShowSigninUI(DWORD cPanes, DWORD dwFlags)
 
 	ShowXLLN(XLLN_SHOW_LOGIN);
 
-	//TODO
+	//TODO XShowSigninUI
 	return ERROR_SUCCESS;
 	// no users signed in with multiplayer privilege. if XSSUI_FLAGS_SHOWONLYONLINEENABLED is flagged?
 	return ERROR_FUNCTION_FAILED;
@@ -868,7 +915,7 @@ DWORD WINAPI XUserCheckPrivilege(DWORD dwUserIndex, XPRIVILEGE_TYPE PrivilegeTyp
 	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
 		return ERROR_NOT_LOGGED_ON;
 
-	if (TRUE)//TODO
+	if (TRUE)//TODO XUserCheckPrivilege
 		*pfResult = TRUE;
 
 	return ERROR_SUCCESS;
@@ -906,7 +953,7 @@ VOID WINAPI XUserSetProperty(DWORD dwUserIndex, DWORD dwPropertyId, DWORD cbValu
 	if (!XLivepIsPropertyIdValid(dwPropertyId, TRUE))
 		return;
 
-	//TODO
+	//TODO XUserSetProperty
 }
 
 // #5277
@@ -944,7 +991,7 @@ DWORD WINAPI XUserWriteAchievements(DWORD dwNumAchievements, CONST XUSER_ACHIEVE
 	if (pAchievements->dwUserIndex >= XLIVE_LOCAL_USER_COUNT)
 		return ERROR_NO_SUCH_USER;
 
-	//TODO
+	//TODO XUserWriteAchievements
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -991,6 +1038,7 @@ DWORD WINAPI XUserCreateAchievementEnumerator(DWORD dwTitleId, DWORD dwUserIndex
 	for (DWORD i = dwStartingIndex; i < dwStartingIndex + cItem; i++) {
 		//?
 	}
+	//TODO XUserCreateAchievementEnumerator
 
 	*pcbBuffer = cItem * sizeof(XACHIEVEMENT_DETAILS);
 	*phEnum = CreateMutex(NULL, NULL, NULL);
@@ -1059,7 +1107,7 @@ DWORD WINAPI XSessionCreate(DWORD dwFlags, DWORD dwUserIndex, DWORD dwMaxPublicS
 	//xlive_session_details.sessionInfo = *pSessionInfo; //check this.
 
 	
-	//TODO
+	//TODO XSessionCreate
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -1135,7 +1183,7 @@ DWORD WINAPI XStorageUploadFromMemory(DWORD dwUserIndex, const WCHAR *wszServerP
 	if (!pbBuffer)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XStorageUploadFromMemory
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -1165,7 +1213,7 @@ DWORD WINAPI XStorageDelete(DWORD dwUserIndex, const WCHAR *wszServerPath, XOVER
 	if (!wszServerPath)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XStorageDelete
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -1229,7 +1277,7 @@ DWORD WINAPI XInviteGetAcceptedInfo(DWORD dwUserIndex, XINVITE_INFO *pInfo)
 	if (!pInfo)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XInviteGetAcceptedInfo
 	if (xlive_invite_to_game) {
 		xlive_invite_to_game = false;
 		unsigned long resolvedAddr;
@@ -1237,7 +1285,7 @@ DWORD WINAPI XInviteGetAcceptedInfo(DWORD dwUserIndex, XINVITE_INFO *pInfo)
 			return ERROR;
 		}
 
-		pInfo->hostInfo.hostAddress.ina.s_addr = resolvedAddr;
+		pInfo->hostInfo.hostAddress.ina.s_addr = htonl(resolvedAddr);
 		pInfo->hostInfo.hostAddress.wPortOnline = htons(2000);
 
 		XUID host_xuid = 1234561000000032;
@@ -1290,7 +1338,7 @@ DWORD WINAPI XUserReadProfileSettings(
 	if (!pResults)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO check this
 	if (*pcbResults < 1036) {
 		*pcbResults = 1036;	// TODO: make correct calculation by IDs.
 		return ERROR_INSUFFICIENT_BUFFER;
@@ -1299,7 +1347,7 @@ DWORD WINAPI XUserReadProfileSettings(
 	pResults->dwSettingsLen = *pcbResults - sizeof(XUSER_PROFILE_SETTING);
 	pResults->pSettings = (XUSER_PROFILE_SETTING *)pResults + sizeof(XUSER_PROFILE_SETTING);
 
-	//TODO
+	//TODO XUserReadProfileSettings
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -1348,7 +1396,7 @@ DWORD WINAPI XStorageBuildServerPath(
 	if (pvStorageFacilityInfo && dwStorageFacilityInfoSize < sizeof(XSTORAGE_FACILITY_GAME_CLIP))
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XStorageBuildServerPath
 
 	return ERROR_FUNCTION_FAILED;
 	return ERROR_SUCCESS;
@@ -1382,7 +1430,7 @@ DWORD WINAPI XStorageDownloadToMemory(
 	if (!pResults)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XStorageDownloadToMemory
 	if (pXOverlapped) {
 		//asynchronous
 

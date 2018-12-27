@@ -4,12 +4,16 @@
 #include "xlive.h"
 #include "../xlln/DebugText.h"
 #include "xnet.h"
+#include "xlocator.h"
+#include <ctime>
+
+#define IPPROTO_VDP 254
 
 INT Result_WSAStartup = WSANOTINITIALISED;
-
 WORD xlive_base_port = 1000;
 BOOL xlive_netsocket_abort = FALSE;
 static SOCKET xlive_VDP_socket = NULL;
+SOCKET xlive_liveoverlan_socket = NULL;
 
 VOID CustomMemCpy(void *dst, void *src, rsize_t len)
 {
@@ -43,7 +47,7 @@ SOCKET WINAPI XSocketCreate(int af, int type, int protocol)
 {
 	TRACE_FX();
 	bool vdp = false;
-	if (protocol == 254) {
+	if (protocol == IPPROTO_VDP) {
 		vdp = true;
 		// We can't support VDP (Voice / Data Protocol) it's some encrypted crap which isn't standard.
 		protocol = IPPROTO_UDP;
@@ -119,8 +123,10 @@ SOCKET WINAPI XSocketBind(SOCKET s, const struct sockaddr *name, int namelen)
 
 	if (hPort == 1000)
 		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port);
-	else if (hPort == 1001)
+	else if (hPort == 1001) {
 		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 1);
+		xlive_liveoverlan_socket = s;
+	}
 	else if (hPort == 1002)
 		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 2);
 	else if (hPort == 1003)
@@ -134,6 +140,7 @@ SOCKET WINAPI XSocketBind(SOCKET s, const struct sockaddr *name, int namelen)
 	else if (hPort == 1007)
 		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 7);
 	else if (s == xlive_VDP_socket) {
+		__debugbreak();
 		//("[h2mod-voice] Game bound potential voice socket to : %i", ntohs(port));
 		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 10);
 	}
@@ -152,6 +159,22 @@ SOCKET WINAPI XSocketBind(SOCKET s, const struct sockaddr *name, int namelen)
 INT WINAPI XSocketConnect(SOCKET s, const struct sockaddr *name, int namelen)
 {
 	TRACE_FX();
+
+	ULONG niplong = ((struct sockaddr_in*)name)->sin_addr.s_addr;
+	ULONG hsecure = ntohl(niplong);
+	WORD hPort = ntohs(((struct sockaddr_in*)name)->sin_port);
+	WORD port_base = (hPort / 1000) * 1000;
+	WORD port_offset = hPort % 1000;
+
+	XNADDR *userPxna = xlive_users_secure.count(hsecure) ? xlive_users_secure[hsecure] : NULL;
+	if (userPxna) {
+		((struct sockaddr_in*)name)->sin_addr.s_addr = userPxna->ina.s_addr;
+		((struct sockaddr_in*)name)->sin_port = htons(ntohs(userPxna->wPortOnline) + port_offset);
+	}
+	else {
+		__debugbreak();
+	}
+
 	INT result = connect(s, name, namelen);
 	return result;
 }
@@ -201,8 +224,38 @@ INT WINAPI XSocketRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *fr
 		WORD hPort = ntohs(((struct sockaddr_in*)from)->sin_port);
 		WORD port_base = (hPort / 1000) * 1000;
 		WORD port_offset = hPort % 1000;
+		std::pair<DWORD, WORD> hostpair = std::make_pair(ntohl(niplong), port_base);
 
-		if (result >= sizeof(XNADDR) + 8 && ((DWORD*)&buf[0])[0] == 0x01233210) {
+		if (result >= sizeof(XNADDR) + 8 && ((DWORD*)&buf[0])[0] == 0x01230124) {
+			EnterCriticalSection(&liveoverlan_sessions_lock);
+			liveoverlan_sessions.erase(hostpair);
+			LeaveCriticalSection(&liveoverlan_sessions_lock);
+		}
+		else if (result >= sizeof(XNADDR) + 8 && ((DWORD*)&buf[0])[0] == 0x01230123) {
+			XLOCATOR_SEARCHRESULT *searchresult = 0;
+			if (LiveOverLanBroadcastReceive(&searchresult, (BYTE*)buf, result)) {
+				addDebugText("Received Broadcast");
+				if (!xlive_users_hostpair.count(hostpair))
+					addDebugText("Received Broadcast - NO USER");
+				EnterCriticalSection(&liveoverlan_sessions_lock);
+				if (liveoverlan_sessions.count(hostpair)) {
+					XLOCATOR_SESSION *oldsession = liveoverlan_sessions[hostpair];
+					LiveOverLanDelete(oldsession->searchresult);
+					delete oldsession;
+				}
+				if (xlive_users_hostpair.count(hostpair)) {
+					memcpy_s(&searchresult->serverAddress, sizeof(XNADDR), xlive_users_hostpair[hostpair], sizeof(XNADDR));
+				}
+				XLOCATOR_SESSION *newsession = new XLOCATOR_SESSION;
+				newsession->searchresult = searchresult;
+				time_t ltime;
+				time(&ltime);
+				newsession->broadcastTime = (unsigned long)ltime;
+				liveoverlan_sessions[hostpair] = newsession;
+				LeaveCriticalSection(&liveoverlan_sessions_lock);
+			}
+		}
+		else if (result >= sizeof(XNADDR) + 8 && ((DWORD*)&buf[0])[0] == 0x01233210) {
 			addDebugText("XLLN: Recv request Unknown User.");
 			XNADDR* pAddr = (XNADDR*)&((DWORD*)&buf[0])[2];
 			pAddr->ina.s_addr = niplong;
@@ -225,8 +278,7 @@ INT WINAPI XSocketRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *fr
 			return 0;
 		}
 
-		std::pair<DWORD, WORD> hostpair = std::make_pair(ntohl(((struct sockaddr_in*)from)->sin_addr.s_addr), port_base);
-		XNADDR* userPxna = xlive_users_hostpair.count(hostpair) ? xlive_users_hostpair[hostpair] : NULL;
+		XNADDR *userPxna = xlive_users_hostpair.count(hostpair) ? xlive_users_hostpair[hostpair] : NULL;
 		if (userPxna) {
 			(((struct sockaddr_in*)from)->sin_addr.s_addr) = userPxna->inaOnline.s_addr;
 		}
@@ -268,12 +320,13 @@ INT WINAPI XSocketSendTo(SOCKET s, const char *buf, int len, int flags, sockaddr
 
 	WORD nPort = ((struct sockaddr_in*)to)->sin_port;
 	WORD hPort = ntohs(nPort);
-	u_long iplong = (((struct sockaddr_in*)to)->sin_addr.s_addr);
+	ULONG niplong = ((struct sockaddr_in*)to)->sin_addr.s_addr;
+	ULONG hsecure = ntohl(niplong);
 	ADDRESS_FAMILY af = (((struct sockaddr_in*)to)->sin_family);
 	WORD port_base = (hPort / 1000) * 1000;
 	WORD port_offset = hPort % 1000;
 
-	if (iplong == INADDR_BROADCAST || iplong == 0x00) {
+	if (niplong == INADDR_BROADCAST || niplong == 0x00) {
 		//addDebugText("XSocketSendTo() - Broadcast.");
 		(((struct sockaddr_in*)to)->sin_addr.s_addr) = htonl(xlive_network_adapter.hBroadcast);//inet_addr("192.168.0.255");
 		
@@ -283,7 +336,7 @@ INT WINAPI XSocketSendTo(SOCKET s, const char *buf, int len, int flags, sockaddr
 		}
 	}
 	else {
-		XNADDR* userPxna = xlive_users_secure.count(iplong) ? xlive_users_secure[iplong] : NULL;
+		XNADDR *userPxna = xlive_users_secure.count(hsecure) ? xlive_users_secure[hsecure] : NULL;
 		if (userPxna) {
 			(((struct sockaddr_in*)to)->sin_addr.s_addr) = userPxna->ina.s_addr;
 			((struct sockaddr_in*)to)->sin_port = htons(ntohs(userPxna->wPortOnline) + port_offset);
@@ -292,7 +345,7 @@ INT WINAPI XSocketSendTo(SOCKET s, const char *buf, int len, int flags, sockaddr
 			std::pair<DWORD, WORD> hostpair = std::make_pair(ntohl(((struct sockaddr_in*)to)->sin_addr.s_addr), port_base);
 			XNADDR* userPxna = xlive_users_hostpair.count(hostpair) ? xlive_users_hostpair[hostpair] : NULL;
 			if (userPxna) {
-				//TODO fix port if remapped.
+				//FIXME fix port if remapped.
 				((struct sockaddr_in*)to)->sin_port = htons(ntohs(userPxna->wPortOnline) + port_offset);
 			}
 			else {

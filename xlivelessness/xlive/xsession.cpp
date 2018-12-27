@@ -10,7 +10,7 @@ DWORD WINAPI XSessionStart(HANDLE hSession, DWORD dwFlags, PXOVERLAPPED pXOverla
 	if (!hSession)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XSessionStart
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -40,7 +40,7 @@ DWORD XSessionLeaveLocal(HANDLE hSession, DWORD dwUserCount, const DWORD *pdwUse
 	if (!pdwUserIndexes)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XSessionLeaveLocal
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -72,7 +72,7 @@ DWORD WINAPI XSessionJoinRemote(HANDLE hSession, DWORD dwXuidCount, const XUID *
 	if (!pfPrivateSlots)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XSessionJoinRemote
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -104,7 +104,7 @@ DWORD WINAPI XSessionJoinLocal(HANDLE hSession, DWORD dwUserCount, const DWORD *
 	if (!pfPrivateSlots)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XSessionJoinLocal
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -130,7 +130,7 @@ DWORD WINAPI XSessionDelete(HANDLE hSession, PXOVERLAPPED pXOverlapped)
 	if (!hSession)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XSessionDelete
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -156,7 +156,7 @@ DWORD WINAPI XSessionEnd(HANDLE hSession, PXOVERLAPPED pXOverlapped)
 	if (!hSession)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XSessionEnd
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -186,7 +186,7 @@ DWORD WINAPI XSessionLeaveRemote(HANDLE hSession, DWORD dwXuidCount, const XUID 
 	if (!pXuids)
 		return ERROR_INVALID_PARAMETER;
 
-	//TODO
+	//TODO XSessionLeaveRemote
 	if (pXOverlapped) {
 		//asynchronous
 

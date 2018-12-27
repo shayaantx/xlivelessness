@@ -15,8 +15,8 @@ VOID CreateUser(XNADDR* pxna)
 {
 	TRACE_FX();
 
-	DWORD secure = pxna->inaOnline.s_addr;
-	XNADDR* userPxna = xlive_users_secure.count(secure) ? xlive_users_secure[secure] : NULL;
+	DWORD hsecure = ntohl(pxna->inaOnline.s_addr);
+	XNADDR *userPxna = xlive_users_secure.count(hsecure) ? xlive_users_secure[hsecure] : NULL;
 	if (userPxna)
 		delete userPxna;
 
@@ -24,7 +24,7 @@ VOID CreateUser(XNADDR* pxna)
 	memset(userPxna, 0x00, sizeof(XNADDR));
 	memcpy(userPxna, pxna, sizeof(XNADDR));
 
-	xlive_users_secure[secure] = userPxna;
+	xlive_users_secure[hsecure] = userPxna;
 
 	std::pair<DWORD, WORD> hostpair = std::make_pair(ntohl(pxna->ina.s_addr), ntohs(pxna->wPortOnline));
 	xlive_users_hostpair[hostpair] = userPxna;
@@ -137,7 +137,8 @@ INT WINAPI XNetInAddrToXnAddr(const IN_ADDR ina, XNADDR *pxna, XNKID *pxnkid)
 {
 	TRACE_FX();
 
-	XNADDR* userPxna = xlive_users_secure.count(ina.s_addr) ? xlive_users_secure[ina.s_addr] : NULL;
+	DWORD hsecure = ntohl(ina.s_addr);
+	XNADDR *userPxna = xlive_users_secure.count(hsecure) ? xlive_users_secure[hsecure] : NULL;
 
 	// Zero memory of the current buffer passed to us by the game.
 	memset(pxna, 0x00, sizeof(XNADDR));
