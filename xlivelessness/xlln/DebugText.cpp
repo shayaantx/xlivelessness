@@ -71,6 +71,8 @@ static void addDebugTextHelper(char* text) {
 	}
 }
 
+static char debug_blarg[1000];
+
 void addDebugText(char* text) {
 	if (!initialisedDebugText)
 		return;
@@ -78,6 +80,20 @@ void addDebugText(char* text) {
 	EnterCriticalSection(&log_section);
 	addDebugTextHelper(text);
 	LeaveCriticalSection(&log_section);
+
+	if (xlln_debug) {
+		char* iblarg = debug_blarg;
+		for (int i = 0; i < 30; i++) {
+			iblarg += snprintf(iblarg, 1000, "%s\r\n", getDebugText(i));
+		}
+		SetDlgItemText(xlln_window_hwnd, MYWINDOW_TBX_TEST, debug_blarg);
+	}
+	/*if (getDebugTextDisplay()) {
+		for (int i = 0; i < getDebugTextArrayMaxLen(); i++) {
+			const char* text = getDebugText(i);
+
+		}
+	}*/
 }
 
 void initDebugText(DWORD dwInstanceId) {
@@ -123,8 +139,6 @@ bool getDebugTextDisplay() {
 //GetLocalTime(&t);
 //fwprintf(log_handle, L"%02d/%02d/%04d %02d:%02d:%02d.%03d ", t.wDay, t.wMonth, t.wYear, t.wHour, t.wMinute, t.wSecond, t.wMilliseconds);
 
-static char debug_blarg[1000];
-
 void trace_func(const char *fxname)
 {
 	for (int i = 0; i < blacklistlen; i++) {
@@ -136,18 +150,4 @@ void trace_func(const char *fxname)
 	snprintf(guibsig, leng, "%s()", fxname);
 	addDebugText(guibsig);
 	free(guibsig);
-
-	if (xlln_debug) {
-		char* iblarg = debug_blarg;
-		for (int i = 0; i < 30; i++) {
-			iblarg += snprintf(iblarg, 1000, "%s\r\n", getDebugText(i));
-		}
-		SetDlgItemText(xlln_window_hwnd, MYWINDOW_TBX_TEST, debug_blarg);
-	}
-	/*if (getDebugTextDisplay()) {
-		for (int i = 0; i < getDebugTextArrayMaxLen(); i++) {
-			const char* text = getDebugText(i);
-
-		}
-	}*/
 }
