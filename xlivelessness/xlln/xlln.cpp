@@ -4,6 +4,7 @@
 #include "../xlive/xdefs.h"
 #include "../xlive/xlive.h"
 #include "RandName.h"
+#include "../resource.h"
 #include <string>
 #include <time.h>
 
@@ -76,8 +77,11 @@ static DWORD WINAPI ThreadProc(LPVOID lpParam)
 	if (!RegisterClassExW(&wc))
 		return FALSE;
 
+	wchar_t title[80];
+	swprintf_s(title, 80, L"XLLN v%d.%d.%d.%d", DLL_VERSION);
+
 	HWND hwdParent = NULL;// FindWindowW(L"Window Injected Into ClassName", L"Window Injected Into Caption");
-	xlln_window_hwnd = CreateWindowExW(0, windowclassname, L"XLLN", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 400, xlln_debug ? 700 : 165, hwdParent, xlln_window_hMenu, hModule, NULL);
+	xlln_window_hwnd = CreateWindowExW(0, windowclassname, title, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 400, xlln_debug ? 700 : 165, hwdParent, xlln_window_hMenu, hModule, NULL);
 	ShowWindow(xlln_window_hwnd, xlln_debug ? SW_NORMAL : SW_HIDE);
 
 	MSG msg;
