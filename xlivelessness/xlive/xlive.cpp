@@ -805,15 +805,16 @@ HRESULT WINAPI XLiveSignin(PWSTR pszLiveIdName, PWSTR pszLiveIdPassword, DWORD d
 	TRACE_FX();
 	if (!pszLiveIdName || !*pszLiveIdName)
 		return E_INVALIDARG;
-	if (!pszLiveIdPassword || !*pszLiveIdPassword)
-		return E_INVALIDARG;
+	//FIXME password isn't being passed in.
+	//if (!pszLiveIdPassword || !*pszLiveIdPassword)
+	//	return E_INVALIDARG;
 
 	if (dwFlags & XLSIGNIN_FLAG_SAVECREDS) {
 
 	}
 	//XLSIGNIN_FLAG_ALLOWTITLEUPDATES XLSIGNIN_FLAG_ALLOWSYSTEMUPDATES
 
-	XLLNLogin(0, FALSE, 0, 0);
+	XLLNLogin(0, TRUE, 0, 0);
 
 	if (pXOverlapped) {
 		//asynchronous
