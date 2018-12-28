@@ -34,13 +34,13 @@ std::map<std::pair<DWORD, WORD>, XLOCATOR_SESSION*> liveoverlan_sessions;
 CRITICAL_SECTION liveoverlan_sessions_lock;
 static std::condition_variable liveoverlan_cond_empty;
 static std::thread liveoverlan_empty_thread;
-static std::atomic<bool> liveoverlan_empty_exit = FALSE;
+static std::atomic<bool> liveoverlan_empty_exit = TRUE;
 
 static CRITICAL_SECTION liveoverlan_broadcast_lock;
 static std::condition_variable liveoverlan_cond_broadcast;
 static std::thread liveoverlan_thread;
 static BOOL liveoverlan_running = FALSE;
-static std::atomic<bool> liveoverlan_exit = FALSE;
+static std::atomic<bool> liveoverlan_exit = TRUE;
 
 static LIVE_SERVER_DETAILS *local_session_details = 0;
 
@@ -101,7 +101,7 @@ static VOID LiveOverLanBroadcast()
 		}
 		LeaveCriticalSection(&liveoverlan_broadcast_lock);
 		std::unique_lock<std::mutex> lock(mymutex);
-		liveoverlan_cond_broadcast.wait_for(lock, std::chrono::seconds(5), []() { return liveoverlan_exit == true; });
+		liveoverlan_cond_broadcast.wait_for(lock, std::chrono::seconds(5), []() { return liveoverlan_exit == TRUE; });
 		if (liveoverlan_exit)
 			break;
 	}
@@ -456,12 +456,16 @@ static VOID LiveOverLanStopBroadcast()
 
 	if (liveoverlan_running) {
 		liveoverlan_running = FALSE;
-		liveoverlan_exit = TRUE;
-		liveoverlan_cond_broadcast.notify_all();
-		liveoverlan_thread.join();
+		LeaveCriticalSection(&liveoverlan_broadcast_lock);
+		if (liveoverlan_exit == FALSE) {
+			liveoverlan_exit = TRUE;
+			liveoverlan_cond_broadcast.notify_all();
+			liveoverlan_thread.join();
+		}
 	}
-	
-	LeaveCriticalSection(&liveoverlan_broadcast_lock);
+	else {
+		LeaveCriticalSection(&liveoverlan_broadcast_lock);
+	}
 }
 
 static VOID LiveOverLanEmpty()
@@ -489,7 +493,7 @@ static VOID LiveOverLanEmpty()
 		LeaveCriticalSection(&liveoverlan_sessions_lock);
 
 		std::unique_lock<std::mutex> lock(mymutex);
-		liveoverlan_cond_empty.wait_for(lock, std::chrono::seconds(10), []() { return liveoverlan_empty_exit == true; });
+		liveoverlan_cond_empty.wait_for(lock, std::chrono::seconds(10), []() { return liveoverlan_empty_exit == TRUE; });
 		if (liveoverlan_empty_exit)
 			break;
 	}
@@ -508,9 +512,23 @@ static VOID LiveOverLanStopEmpty()
 	}
 	liveoverlan_sessions.clear();
 	LeaveCriticalSection(&liveoverlan_sessions_lock);
-	liveoverlan_empty_exit = TRUE;
-	liveoverlan_cond_empty.notify_all();
-	liveoverlan_empty_thread.join();
+	if (liveoverlan_empty_exit == FALSE) {
+		liveoverlan_empty_exit = TRUE;
+		liveoverlan_cond_empty.notify_all();
+		liveoverlan_empty_thread.join();
+	}
+}
+
+VOID LiveOverLanAbort()
+{
+	if (liveoverlan_empty_exit == FALSE) {
+		liveoverlan_empty_exit = TRUE;
+		liveoverlan_empty_thread.detach();
+	}
+	if (liveoverlan_exit == FALSE) {
+		liveoverlan_exit = TRUE;
+		liveoverlan_thread.detach();
+	}
 }
 
 // #5230

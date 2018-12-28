@@ -3,6 +3,7 @@
 #include "DebugText.h"
 #include "../xlive/xdefs.h"
 #include "../xlive/xlive.h"
+#include "../xlive/xlocator.h"
 #include "RandName.h"
 #include "../resource.h"
 #include <string>
@@ -181,6 +182,7 @@ static LRESULT CALLBACK DLLWindowProc(HWND hwnd, UINT message, WPARAM wParam, LP
 	else if (message == WM_COMMAND) {
 		if (wParam == MYMENU_EXIT) {
 			//SendMessage(hwnd, WM_CLOSE, 0, 0);
+			LiveOverLanAbort();
 			exit(0);
 		}
 		else if (wParam == MYMENU_ALWAYSTOP) {

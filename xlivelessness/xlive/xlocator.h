@@ -11,6 +11,7 @@ extern std::map<HANDLE, std::vector<std::pair<DWORD, WORD>>> xlive_xlocator_enum
 extern std::map<std::pair<DWORD, WORD>, XLOCATOR_SESSION*> liveoverlan_sessions;
 extern CRITICAL_SECTION liveoverlan_sessions_lock;
 
+VOID LiveOverLanAbort();
 VOID LiveOverLanClone(XLOCATOR_SEARCHRESULT **dst, XLOCATOR_SEARCHRESULT *src);
 VOID LiveOverLanDelete(XLOCATOR_SEARCHRESULT *xlocator_result);
 BOOL LiveOverLanBroadcastReceive(PXLOCATOR_SEARCHRESULT *result, BYTE *buf, DWORD buflen);
