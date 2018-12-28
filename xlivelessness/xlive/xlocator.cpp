@@ -27,7 +27,7 @@ typedef struct {
 } LIVE_SERVER_DETAILS;
 #pragma pack(pop) // return to original alignment setting
 
-//FIXME Needs a critical section
+CRITICAL_SECTION xlive_xlocator_enumerators_lock;
 std::map<HANDLE, std::vector<std::pair<DWORD, WORD>>> xlive_xlocator_enumerators;
 
 std::map<std::pair<DWORD, WORD>, XLOCATOR_SESSION*> liveoverlan_sessions;
@@ -748,7 +748,9 @@ DWORD WINAPI XLocatorCreateServerEnumerator(
 		cItems = 200;
 	*pcbBuffer = (cItems) * sizeof(XLOCATOR_SEARCHRESULT);
 	*phEnum = CreateMutex(NULL, NULL, NULL);
+	EnterCriticalSection(&xlive_xlocator_enumerators_lock);
 	xlive_xlocator_enumerators[*phEnum];
+	LeaveCriticalSection(&xlive_xlocator_enumerators_lock);
 
 	return S_OK;
 }

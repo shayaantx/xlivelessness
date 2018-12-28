@@ -390,6 +390,7 @@ HRESULT WINAPI XLiveInitialize(XLIVE_INITIALIZE_INFO *pPii)
 	memset(&xlive_session_details, 0, sizeof(XSESSION_LOCAL_DETAILS));
 
 	InitializeCriticalSection(&d_lock);
+	InitializeCriticalSection(&xlive_xlocator_enumerators_lock);
 
 	wchar_t mutex_name[40];
 	DWORD mutex_last_error;
@@ -433,6 +434,8 @@ VOID WINAPI XLiveUninitialize()
 {
 	TRACE_FX();
 	INT error_XRender = UninitXRender();
+	DeleteCriticalSection(&xlive_xlocator_enumerators_lock);
+	DeleteCriticalSection(&d_lock);
 }
 
 // #5007
@@ -628,9 +631,11 @@ BOOL WINAPI XCloseHandle(HANDLE hObject)
 		SetLastError(ERROR_INVALID_PARAMETER);
 		return FALSE;
 	}
+	EnterCriticalSection(&xlive_xlocator_enumerators_lock);
 	if (xlive_xlocator_enumerators.count(hObject)) {
 		xlive_xlocator_enumerators.erase(hObject);
 	}
+	LeaveCriticalSection(&xlive_xlocator_enumerators_lock);
 	if (!CloseHandle(hObject)) {
 		SetLastError(ERROR_INVALID_HANDLE);
 		return FALSE;
@@ -675,6 +680,7 @@ DWORD WINAPI XEnumerate(HANDLE hEnum, PVOID pvBuffer, DWORD cbBuffer, PDWORD pcI
 	if (!pcItemsReturned && !pXOverlapped)
 		return ERROR_INVALID_PARAMETER;
 
+	EnterCriticalSection(&xlive_xlocator_enumerators_lock);
 	if (xlive_xlocator_enumerators.count(hEnum)) {
 		xlive_xlocator_enumerators[hEnum];
 
@@ -692,6 +698,7 @@ DWORD WINAPI XEnumerate(HANDLE hEnum, PVOID pvBuffer, DWORD cbBuffer, PDWORD pcI
 			LiveOverLanClone(&server, session.second->searchresult);
 		}
 		LeaveCriticalSection(&liveoverlan_sessions_lock);
+		LeaveCriticalSection(&xlive_xlocator_enumerators_lock);
 
 		if (pXOverlapped) {
 			//pXOverlapped->InternalHigh = ERROR_IO_INCOMPLETE;
@@ -716,6 +723,7 @@ DWORD WINAPI XEnumerate(HANDLE hEnum, PVOID pvBuffer, DWORD cbBuffer, PDWORD pcI
 			return ERROR_SUCCESS;
 		}
 	}
+	LeaveCriticalSection(&xlive_xlocator_enumerators_lock);
 
 	//TODO XEnumerate
 	if (pXOverlapped) {

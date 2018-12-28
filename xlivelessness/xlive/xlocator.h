@@ -7,6 +7,7 @@ typedef struct {
 	DWORD broadcastTime;
 } XLOCATOR_SESSION;
 
+extern CRITICAL_SECTION xlive_xlocator_enumerators_lock;
 extern std::map<HANDLE, std::vector<std::pair<DWORD, WORD>>> xlive_xlocator_enumerators;
 extern std::map<std::pair<DWORD, WORD>, XLOCATOR_SESSION*> liveoverlan_sessions;
 extern CRITICAL_SECTION liveoverlan_sessions_lock;
