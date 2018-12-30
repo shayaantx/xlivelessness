@@ -5,6 +5,7 @@
 #include "../xlive/xlive.h"
 #include "../xlive/xlocator.h"
 #include "../xlive/xrender.h"
+#include "../xlive/xsocket.h"
 #include "RandName.h"
 #include "../resource.h"
 #include <string>
@@ -20,7 +21,7 @@ static int xlln_instance = 0;
 static INT xlln_login_player = 0;
 static INT xlln_login_player_h[] = { MYMENU_LOGIN1, MYMENU_LOGIN2, MYMENU_LOGIN3, MYMENU_LOGIN4 };
 
-const BOOL xlln_debug = TRUE;
+BOOL xlln_debug = FALSE;
 
 static HMENU CreateDLLWindowMenu(HINSTANCE hModule)
 {
@@ -197,7 +198,17 @@ static LRESULT CALLBACK DLLWindowProc(HWND hwnd, UINT message, WPARAM wParam, LP
 			CheckMenuItem(xlln_window_hMenu, MYMENU_ALWAYSTOP, checked ? MF_CHECKED : MF_UNCHECKED);
 		}
 		else if (wParam == MYMENU_ABOUT) {
-			MessageBox(hwnd, "Created by Glitchy Scripts,\nwith thanks to PermaNulled.\n\nExecutable Launch Parameters:\n-debugxlln ? Sleep until debugger attach.\n-debugxlive ? Sleep XLiveInitialize until debugger attach.\n-xlivefps=<uint> ? 0 to disable fps limiter.", "About", MB_OK);
+			MessageBox(hwnd,
+"Created by Glitchy Scripts,\n\
+with thanks to PermaNulled.\n\
+\n\
+Executable Launch Parameters:\n\
+-xlivefps=<uint> ? 0 to disable fps limiter.\n\
+-xllndebug ? Sleep until debugger attach.\n\
+-xllndebuglog ? Enable debug log.\n\
+-xlivedebug ? Sleep XLiveInitialize until debugger attach.\n\
+-xlivenetdisable ? Disable all network functionality."
+				, "About", MB_OK);
 		}
 		else if (wParam == MYMENU_LOGIN1) {
 			xlln_login_player = 0;
@@ -291,17 +302,23 @@ INT InitXLLN(HMODULE hModule)
 	LPWSTR* lpwszArglist = CommandLineToArgvW(GetCommandLineW(), &nArgs);
 	if (lpwszArglist != NULL) {
 		for (int i = 1; i < nArgs; i++) {
-			if (wcsstr(lpwszArglist[i], L"-debugxlln") != NULL) {
-				xlln_debug_pause = TRUE;
-			}
-			else if (wcsstr(lpwszArglist[i], L"-debugxlive") != NULL) {
-				xlive_debug_pause = TRUE;
-			}
-			else if (wcsstr(lpwszArglist[i], L"-xlivefps=") != NULL) {
+			if (wcsstr(lpwszArglist[i], L"-xlivefps=") != NULL) {
 				DWORD tempuint = 0;
 				if (swscanf_s(lpwszArglist[i], L"-xlivefps=%u", &tempuint) == 1) {
 					xlive_fps_limit = tempuint;
 				}
+			}
+			else if (wcscmp(lpwszArglist[i], L"-xllndebug") == 0) {
+				xlln_debug_pause = TRUE;
+			}
+			else if (wcscmp(lpwszArglist[i], L"-xllndebuglog") == 0) {
+				xlln_debug = TRUE;
+			}
+			else if (wcscmp(lpwszArglist[i], L"-xlivedebug") == 0) {
+				xlive_debug_pause = TRUE;
+			}
+			else if (wcscmp(lpwszArglist[i], L"-xlivenetdisable") == 0) {
+				xlive_netsocket_abort = TRUE;
 			}
 		}
 	}

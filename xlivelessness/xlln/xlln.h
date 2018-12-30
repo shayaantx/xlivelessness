@@ -24,4 +24,4 @@ INT UninitXLLN();
 INT ShowXLLN(DWORD dwShowType);
 
 extern HWND xlln_window_hwnd;
-extern const BOOL xlln_debug;
+extern BOOL xlln_debug;
