@@ -14,6 +14,9 @@ bool getDebugTextDisplay();
 
 void trace_func(const char *fxname);
 
+VOID XllnDebugBreak(char* message);
+VOID XllnDebugBreak(const char* message);
+
 #define TRACE_FX() \
     trace_func(__func__)
 

@@ -63,6 +63,7 @@ INT WINAPI XNetStartup(const XNetStartupParams *pxnsp)
 INT WINAPI XNetCleanup()
 {
 	TRACE_FX();
+	xlive_net_initialized = FALSE;
 	if (Result_WSAStartup != 0)
 		return WSANOTINITIALISED;
 	return ERROR_SUCCESS;

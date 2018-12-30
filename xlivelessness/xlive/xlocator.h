@@ -16,3 +16,4 @@ VOID LiveOverLanAbort();
 VOID LiveOverLanClone(XLOCATOR_SEARCHRESULT **dst, XLOCATOR_SEARCHRESULT *src);
 VOID LiveOverLanDelete(XLOCATOR_SEARCHRESULT *xlocator_result);
 BOOL LiveOverLanBroadcastReceive(PXLOCATOR_SEARCHRESULT *result, BYTE *buf, DWORD buflen);
+BYTE LiveOverLanRecieve(const std::pair<DWORD, WORD> hostpair, char* buf, INT& result);

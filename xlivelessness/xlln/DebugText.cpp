@@ -12,8 +12,8 @@ static bool DebugTextDisplay = false;
 static FILE* debugFile = NULL;
 static bool initialisedDebugText = false;
 
-static const int blacklistlen = 11;
-static const char* blacklist[blacklistlen] = { "XLiveRender", "XNetGetEthernetLinkStatus", "XLiveInput", "XLivePreTranslateMessage", "XLivePBufferGetByte", "XSocketWSAGetLastError", "XSocketRecvFrom", "XNotifyGetNext", "XUserCheckPrivilege", "XNetGetConnectStatus", "XSocketHTONL" };
+static const int blacklistlen = 12;
+static const char* blacklist[blacklistlen] = { "XLiveRender", "XNetGetEthernetLinkStatus", "XLiveInput", "XLivePreTranslateMessage", "XLivePBufferGetByte", "XSocketWSAGetLastError", "XSocketRecvFrom", "XNotifyGetNext", "XUserCheckPrivilege", "XNetGetConnectStatus", "XSocketHTONL", "XSocketAccept" };
 
 
 int getDebugTextArrayMaxLen() {
@@ -150,4 +150,16 @@ void trace_func(const char *fxname)
 	snprintf(guibsig, leng, "%s()", fxname);
 	addDebugText(guibsig);
 	free(guibsig);
+}
+
+VOID XllnDebugBreak(char* message)
+{
+	addDebugText(message);
+	MessageBox(NULL, message, "Illegal State", MB_OK);
+	__debugbreak();
+}
+
+VOID XllnDebugBreak(const char* message)
+{
+	XllnDebugBreak((char*)message);
 }

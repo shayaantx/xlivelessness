@@ -10,7 +10,7 @@ BOOL Initialised_XRender = FALSE;
 static LPDIRECT3DDEVICE9 pDevice;
 static D3DPRESENT_PARAMETERS *pD3DPP;
 
-static int xlive_fps_limit = 60;
+DWORD xlive_fps_limit = 60;
 
 static std::chrono::system_clock::time_point nextFrame;
 static std::chrono::system_clock::duration desiredRenderTime;

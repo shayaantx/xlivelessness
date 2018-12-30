@@ -1,5 +1,7 @@
 #pragma once
 
+extern BOOL xlive_debug_pause;
+
 #define XLIVE_LOCAL_USER_COUNT 4
 
 extern BOOL xlive_users_info_changed[XLIVE_LOCAL_USER_COUNT];

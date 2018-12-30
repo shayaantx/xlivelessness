@@ -10,6 +10,8 @@
 #include <atomic>
 #include <vector>
 
+static BOOL xlive_xlocator_initialized = FALSE;
+
 #pragma pack(push) // save current alignment setting
 #pragma pack(1)   // specify single-byte alignment
 typedef struct {
@@ -41,6 +43,7 @@ static std::condition_variable liveoverlan_cond_broadcast;
 static std::thread liveoverlan_thread;
 static BOOL liveoverlan_running = FALSE;
 static std::atomic<bool> liveoverlan_exit = TRUE;
+static std::atomic<bool> liveoverlan_break_sleep = FALSE;
 
 static LIVE_SERVER_DETAILS *local_session_details = 0;
 
@@ -96,14 +99,18 @@ static VOID LiveOverLanBroadcast()
 			SendStruct.sin_addr.s_addr = INADDR_BROADCAST;
 			SendStruct.sin_family = AF_INET;
 
+			if (!xlive_liveoverlan_socket)
+				XllnDebugBreak("xlive_liveoverlan_socket never got initialized!");
+
 			XSocketSendTo(xlive_liveoverlan_socket, (char*)local_session_details, local_session_details->pProperties + sizeof(LIVE_SERVER_DETAILS), 0, (SOCKADDR*)&SendStruct, sizeof(SendStruct));
 
 		}
 		LeaveCriticalSection(&liveoverlan_broadcast_lock);
 		std::unique_lock<std::mutex> lock(mymutex);
-		liveoverlan_cond_broadcast.wait_for(lock, std::chrono::seconds(5), []() { return liveoverlan_exit == TRUE; });
+		liveoverlan_cond_broadcast.wait_for(lock, std::chrono::seconds(10), []() { return liveoverlan_exit == TRUE || liveoverlan_break_sleep == TRUE; });
 		if (liveoverlan_exit)
 			break;
+		liveoverlan_break_sleep = FALSE;
 	}
 }
 BOOL LiveOverLanBroadcastReceive(PXLOCATOR_SEARCHRESULT *result, BYTE *buf, DWORD buflen)
@@ -292,9 +299,8 @@ static VOID LiveOverLanBroadcastData(XUID *xuid,
 		// A null property id should not exist.
 		__debugbreak();
 	}
-	if (!local_session_properties.count(0x40008230) && xlive_users_info[0]->xuid == *xuid) {
+	if (!local_session_properties.count(XUSER_PROPERTY_SERVER_NAME) && xlive_users_info[0]->xuid == *xuid) {
 		XUSER_PROPERTY* prop = new XUSER_PROPERTY;
-		
 		prop->dwPropertyId = 0;//so we know to delete this one later.
 		prop->value.type = XUSER_DATA_TYPE_UNICODE;
 		DWORD strlen = strnlen(xlive_users_info[0]->szUserName, XUSER_MAX_NAME_LENGTH) + 1;
@@ -302,7 +308,7 @@ static VOID LiveOverLanBroadcastData(XUID *xuid,
 		prop->value.string.pwszData = new WCHAR[strlen];
 		swprintf_s(prop->value.string.pwszData, strlen, L"%hs", xlive_users_info[0]->szUserName);
 
-		local_session_properties[0x40008230] = prop;
+		local_session_properties[XUSER_PROPERTY_SERVER_NAME] = prop;
 	}
 
 	DWORD buflen = sizeof(LIVE_SERVER_DETAILS);
@@ -435,11 +441,55 @@ static VOID LiveOverLanBroadcastData(XUID *xuid,
 	local_session_details = new_local_sd;
 	LeaveCriticalSection(&liveoverlan_broadcast_lock);
 }
+BYTE LiveOverLanRecieve(const std::pair<DWORD, WORD> hostpair, char* buf, INT& result)
+{
+	if (result == sizeof(DWORD) + sizeof(XUID) && *((DWORD*)&buf[0]) == 0x01230124) {
+		XUID &hostXuid = *((XUID*)&buf[4]);
+		addDebugText("Received Broadcast Unadvertise");
+		EnterCriticalSection(&liveoverlan_sessions_lock);
+		liveoverlan_sessions.erase(hostpair);
+		LeaveCriticalSection(&liveoverlan_sessions_lock);
+		return 1;
+	}
+	else if (result >= sizeof(XNADDR) + 8 && ((DWORD*)&buf[0])[0] == 0x01230123) {
+		XLOCATOR_SEARCHRESULT *searchresult = 0;
+		if (!xlive_users_hostpair.count(hostpair)) {
+			addDebugText("Received Broadcast - NO USER");
+			result = 0;
+		}
+		else if (LiveOverLanBroadcastReceive(&searchresult, (BYTE*)buf, result)) {
+			addDebugText("Received Broadcast");
+			EnterCriticalSection(&liveoverlan_sessions_lock);
+			if (liveoverlan_sessions.count(hostpair)) {
+				XLOCATOR_SESSION *oldsession = liveoverlan_sessions[hostpair];
+				LiveOverLanDelete(oldsession->searchresult);
+				delete oldsession;
+			}
+			if (xlive_users_hostpair.count(hostpair)) {
+				memcpy_s(&searchresult->serverAddress, sizeof(XNADDR), xlive_users_hostpair[hostpair], sizeof(XNADDR));
+			}
+			XLOCATOR_SESSION *newsession = new XLOCATOR_SESSION;
+			newsession->searchresult = searchresult;
+			time_t ltime;
+			time(&ltime);
+			newsession->broadcastTime = (unsigned long)ltime;
+			liveoverlan_sessions[hostpair] = newsession;
+			LeaveCriticalSection(&liveoverlan_sessions_lock);
+			return 1;
+		}
+		return 2;
+	}
+	return FALSE;
+}
 static VOID LiveOverLanStartBroadcast()
 {
 	EnterCriticalSection(&liveoverlan_broadcast_lock);
 
-	if (!liveoverlan_running) {
+	if (liveoverlan_running) {
+		liveoverlan_break_sleep = TRUE;
+		liveoverlan_cond_broadcast.notify_all();
+	}
+	else {
 		liveoverlan_running = TRUE;
 		liveoverlan_exit = FALSE;
 		liveoverlan_thread = std::thread(LiveOverLanBroadcast);
@@ -472,7 +522,7 @@ static VOID LiveOverLanEmpty()
 {
 	std::mutex mymutex;
 	while (1) {
-		addDebugText("LiveOverLan Empty");
+		addDebugText("LiveOverLan Remove Old Entries");
 		EnterCriticalSection(&liveoverlan_sessions_lock);
 		
 		std::vector<std::pair<DWORD, WORD>> removesessions;
@@ -566,6 +616,8 @@ HRESULT WINAPI XLocatorServerAdvertise(
 		return E_INVALIDARG;
 	if (cProperties > INT_MAX)
 		return E_INVALIDARG;
+	if (!xlive_xlocator_initialized)
+		return E_FAIL;
 
 	LiveOverLanBroadcastData(&xlive_users_info[dwUserIndex]->xuid, dwServerType, xnkid, xnkey, dwMaxPublicSlots, dwMaxPrivateSlots, dwFilledPublicSlots, dwFilledPrivateSlots, cProperties, pProperties);
 	LiveOverLanStartBroadcast();
@@ -596,6 +648,8 @@ HRESULT WINAPI XLocatorServerUnAdvertise(DWORD dwUserIndex, PXOVERLAPPED pXOverl
 		return E_INVALIDARG;
 	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
 		return E_INVALIDARG;
+	if (!xlive_xlocator_initialized)
+		return E_FAIL;
 
 	LiveOverLanStopBroadcast();
 
@@ -604,12 +658,15 @@ HRESULT WINAPI XLocatorServerUnAdvertise(DWORD dwUserIndex, PXOVERLAPPED pXOverl
 	SendStruct.sin_addr.s_addr = INADDR_BROADCAST;
 	SendStruct.sin_family = AF_INET;
 
-	//FIXME write a better packet and handler (padding1) for this.
-	LIVE_SERVER_DETAILS ohboy;
-	ohboy.padding1 = 0x01230124;
-	ohboy.xuid = xlive_users_info[dwUserIndex]->xuid;
+	const DWORD buflen = sizeof(DWORD) + sizeof(XUID);
+	BYTE unadvertiseData[buflen];
+	*((DWORD*)&unadvertiseData[0]) = 0x01230124;
+	*((XUID*)&unadvertiseData[4]) = xlive_users_info[dwUserIndex]->xuid;
 
-	XSocketSendTo(xlive_liveoverlan_socket, (char*)&ohboy, sizeof(LIVE_SERVER_DETAILS), 0, (SOCKADDR*)&SendStruct, sizeof(SendStruct));
+	if (!xlive_liveoverlan_socket)
+		XllnDebugBreak("xlive_liveoverlan_socket never got initialized!");
+
+	XSocketSendTo(xlive_liveoverlan_socket, (char*)unadvertiseData, buflen, 0, (SOCKADDR*)&SendStruct, sizeof(SendStruct));
 
 	if (pXOverlapped) {
 		//asynchronous
@@ -641,6 +698,8 @@ HRESULT WINAPI XLocatorGetServiceProperty(DWORD dwUserIndex, DWORD cNumPropertie
 		return E_INVALIDARG;
 	if (!pProperties)
 		return E_POINTER;
+	if (!xlive_xlocator_initialized)
+		return E_FAIL;
 
 	EnterCriticalSection(&liveoverlan_sessions_lock);
 	if (cNumProperties > XLOCATOR_PROPERTY_LIVE_COUNT_TOTAL)
@@ -743,6 +802,8 @@ DWORD WINAPI XLocatorCreateServerEnumerator(
 		return ERROR_INVALID_PARAMETER;
 	if (!phEnum)
 		return ERROR_INVALID_PARAMETER;
+	if (!xlive_net_initialized)
+		return ERROR_FUNCTION_FAILED;
 
 	if (cItems > 200)
 		cItems = 200;
@@ -768,6 +829,10 @@ HRESULT WINAPI XLocatorServiceInitialize(XLOCATOR_INIT_INFO *pXii, PHANDLE phLoc
 	TRACE_FX();
 	if (!pXii)
 		return E_POINTER;
+	if (!xlive_netsocket_abort)
+		xlive_xlocator_initialized = TRUE;
+	if (!xlive_xlocator_initialized)
+		return E_FAIL;
 
 	InitializeCriticalSection(&liveoverlan_broadcast_lock);
 	InitializeCriticalSection(&liveoverlan_sessions_lock);
@@ -778,18 +843,23 @@ HRESULT WINAPI XLocatorServiceInitialize(XLOCATOR_INIT_INFO *pXii, PHANDLE phLoc
 		*phLocatorService = CreateMutex(NULL, NULL, NULL);
 	
 	return S_OK;
-	return S_FALSE;
 }
 
 // #5237
 HRESULT WINAPI XLocatorServiceUnInitialize(HANDLE hLocatorService)
 {
 	TRACE_FX();
+	if (!xlive_xlocator_initialized) {
+		SetLastError(ERROR_FUNCTION_FAILED);
+		return E_FAIL;
+	}
 
 	LiveOverLanStopBroadcast();
 	LiveOverLanStopEmpty();
 	DeleteCriticalSection(&liveoverlan_broadcast_lock);
 	DeleteCriticalSection(&liveoverlan_sessions_lock);
+
+	xlive_xlocator_initialized = FALSE;
 
 	if (!hLocatorService || (DWORD)hLocatorService == -1) {
 		SetLastError(ERROR_INVALID_PARAMETER);

@@ -119,38 +119,29 @@ INT WINAPI XSocketGetSockOpt(SOCKET s, int level, int optname, char *optval, int
 SOCKET WINAPI XSocketBind(SOCKET s, const struct sockaddr *name, int namelen)
 {
 	TRACE_FX();
-	int hPort = ntohs(((struct sockaddr_in*)name)->sin_port);
+	WORD hPort = ntohs(((struct sockaddr_in*)name)->sin_port);
+	WORD port_base = (hPort / 1000) * 1000;
+	WORD port_offset = hPort % 1000;
 
-	if (hPort == 1000)
-		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port);
-	else if (hPort == 1001) {
+	if (port_offset == 1) {
 		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 1);
 		xlive_liveoverlan_socket = s;
 	}
-	else if (hPort == 1002)
-		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 2);
-	else if (hPort == 1003)
-		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 3);
-	else if (hPort == 1004)
-		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 4);
-	else if (hPort == 1005)
-		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 5);
-	else if (hPort == 1006)
-		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 6);
-	else if (hPort == 1007)
-		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 7);
-	else if (s == xlive_VDP_socket) {
-		__debugbreak();
-		//("[h2mod-voice] Game bound potential voice socket to : %i", ntohs(port));
-		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 10);
+	//else if (s == xlive_VDP_socket) {
+	//	__debugbreak();
+	//	//("[h2mod-voice] Game bound potential voice socket to : %i", ntohs(port));
+	//	((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + 10);
+	//}
+	else {
+		((struct sockaddr_in*)name)->sin_port = htons(xlive_base_port + port_offset);
 	}
-	else
-		__debugbreak();
 
 	SOCKET result = bind(s, name, namelen);
 
 	if (result == SOCKET_ERROR) {
-		__debugbreak();
+		char debugText[200];
+		snprintf(debugText, sizeof(debugText), "Socket Bind ERROR.\nAnother program has taken port:\nBase: %hd\nOffset: %hd\nOriginal: %hd", xlive_base_port, port_offset, hPort);
+		XllnDebugBreak(debugText);
 	}
 	return result;
 }
@@ -226,44 +217,19 @@ INT WINAPI XSocketRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *fr
 		WORD port_offset = hPort % 1000;
 		std::pair<DWORD, WORD> hostpair = std::make_pair(ntohl(niplong), port_base);
 
-		if (result >= sizeof(XNADDR) + 8 && ((DWORD*)&buf[0])[0] == 0x01230124) {
-			EnterCriticalSection(&liveoverlan_sessions_lock);
-			liveoverlan_sessions.erase(hostpair);
-			LeaveCriticalSection(&liveoverlan_sessions_lock);
+		if (BYTE LOLR = LiveOverLanRecieve(hostpair, buf, result)) {
+			if (LOLR == 1)
+				return 0;
 		}
-		else if (result >= sizeof(XNADDR) + 8 && ((DWORD*)&buf[0])[0] == 0x01230123) {
-			XLOCATOR_SEARCHRESULT *searchresult = 0;
-			if (LiveOverLanBroadcastReceive(&searchresult, (BYTE*)buf, result)) {
-				addDebugText("Received Broadcast");
-				if (!xlive_users_hostpair.count(hostpair))
-					addDebugText("Received Broadcast - NO USER");
-				EnterCriticalSection(&liveoverlan_sessions_lock);
-				if (liveoverlan_sessions.count(hostpair)) {
-					XLOCATOR_SESSION *oldsession = liveoverlan_sessions[hostpair];
-					LiveOverLanDelete(oldsession->searchresult);
-					delete oldsession;
-				}
-				if (xlive_users_hostpair.count(hostpair)) {
-					memcpy_s(&searchresult->serverAddress, sizeof(XNADDR), xlive_users_hostpair[hostpair], sizeof(XNADDR));
-				}
-				XLOCATOR_SESSION *newsession = new XLOCATOR_SESSION;
-				newsession->searchresult = searchresult;
-				time_t ltime;
-				time(&ltime);
-				newsession->broadcastTime = (unsigned long)ltime;
-				liveoverlan_sessions[hostpair] = newsession;
-				LeaveCriticalSection(&liveoverlan_sessions_lock);
-			}
-		}
-		else if (result >= sizeof(XNADDR) + 8 && ((DWORD*)&buf[0])[0] == 0x01233210) {
+		else if (result >= sizeof(XNADDR) + 8 && (((DWORD*)&buf[0])[0] == 0x01230121 || ((DWORD*)&buf[0])[0] == 0x01230122)) {
 			addDebugText("XLLN: Recv request Unknown User.");
-			XNADDR* pAddr = (XNADDR*)&((DWORD*)&buf[0])[2];
+			XNADDR* pAddr = (XNADDR*)&((DWORD*)&buf[0])[1];
 			pAddr->ina.s_addr = niplong;
 			CreateUser(pAddr);
 
-			if (((DWORD*)&buf[0])[1] == 0x01233210) {
+			if (((DWORD*)&buf[0])[0] == 0x01230121) {
 				addDebugText("XLLN: Send reply Unknown User.");
-				((DWORD*)&buf[0])[1] = 0x01230123;
+				((DWORD*)&buf[0])[0] = 0x01230122;
 				memcpy_s(pAddr, sizeof(XNADDR), &xlive_local_users[0].pxna, sizeof(XNADDR));
 
 				INT bytesSent = sendto(s, buf, len, 0, from, *fromlen);
@@ -288,9 +254,8 @@ INT WINAPI XSocketRecvFrom(SOCKET s, char *buf, int len, int flags, sockaddr *fr
 			DWORD buf2len = result + buf2datasize;
 			BYTE *buf2 = (BYTE*)malloc(buf2len);
 			memcpy_s(buf2 + buf2datasize, result, buf, result);
-			((DWORD*)&buf2[0])[0] = 0x01233210;
-			((DWORD*)&buf2[0])[1] = 0x01233210;
-			XNADDR* blarg = (XNADDR*)&((DWORD*)&buf2[0])[2];
+			((DWORD*)&buf2[0])[0] = 0x01230121;
+			XNADDR* blarg = (XNADDR*)&((DWORD*)&buf2[0])[1];
 			memset(blarg, 0x00, sizeof(XNADDR));
 			memcpy_s(blarg, sizeof(XNADDR), &xlive_local_users[0].pxna, sizeof(XNADDR));
 

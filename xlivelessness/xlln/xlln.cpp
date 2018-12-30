@@ -4,6 +4,7 @@
 #include "../xlive/xdefs.h"
 #include "../xlive/xlive.h"
 #include "../xlive/xlocator.h"
+#include "../xlive/xrender.h"
 #include "RandName.h"
 #include "../resource.h"
 #include <string>
@@ -19,7 +20,7 @@ static int xlln_instance = 0;
 static INT xlln_login_player = 0;
 static INT xlln_login_player_h[] = { MYMENU_LOGIN1, MYMENU_LOGIN2, MYMENU_LOGIN3, MYMENU_LOGIN4 };
 
-const BOOL xlln_debug = FALSE;
+const BOOL xlln_debug = TRUE;
 
 static HMENU CreateDLLWindowMenu(HINSTANCE hModule)
 {
@@ -183,7 +184,7 @@ static LRESULT CALLBACK DLLWindowProc(HWND hwnd, UINT message, WPARAM wParam, LP
 		if (wParam == MYMENU_EXIT) {
 			//SendMessage(hwnd, WM_CLOSE, 0, 0);
 			LiveOverLanAbort();
-			exit(0);
+			exit(EXIT_SUCCESS);
 		}
 		else if (wParam == MYMENU_ALWAYSTOP) {
 			BOOL checked = GetMenuState(xlln_window_hMenu, MYMENU_ALWAYSTOP, 0) != MF_CHECKED;
@@ -196,7 +197,7 @@ static LRESULT CALLBACK DLLWindowProc(HWND hwnd, UINT message, WPARAM wParam, LP
 			CheckMenuItem(xlln_window_hMenu, MYMENU_ALWAYSTOP, checked ? MF_CHECKED : MF_UNCHECKED);
 		}
 		else if (wParam == MYMENU_ABOUT) {
-			MessageBox(hwnd, "Created by Glitchy Scripts,\nwith thanks to PermaNulled.", "About", MB_OK);
+			MessageBox(hwnd, "Created by Glitchy Scripts,\nwith thanks to PermaNulled.\n\nExecutable Launch Parameters:\n-debugxlln ? Sleep until debugger attach.\n-debugxlive ? Sleep XLiveInitialize until debugger attach.\n-xlivefps=<uint> ? 0 to disable fps limiter.", "About", MB_OK);
 		}
 		else if (wParam == MYMENU_LOGIN1) {
 			xlln_login_player = 0;
@@ -284,6 +285,31 @@ INT ShowXLLN(DWORD dwShowType)
 
 INT InitXLLN(HMODULE hModule)
 {
+	BOOL xlln_debug_pause = FALSE;
+
+	int nArgs;
+	LPWSTR* lpwszArglist = CommandLineToArgvW(GetCommandLineW(), &nArgs);
+	if (lpwszArglist != NULL) {
+		for (int i = 1; i < nArgs; i++) {
+			if (wcsstr(lpwszArglist[i], L"-debugxlln") != NULL) {
+				xlln_debug_pause = TRUE;
+			}
+			else if (wcsstr(lpwszArglist[i], L"-debugxlive") != NULL) {
+				xlive_debug_pause = TRUE;
+			}
+			else if (wcsstr(lpwszArglist[i], L"-xlivefps=") != NULL) {
+				DWORD tempuint = 0;
+				if (swscanf_s(lpwszArglist[i], L"-xlivefps=%u", &tempuint) == 1) {
+					xlive_fps_limit = tempuint;
+				}
+			}
+		}
+	}
+	LocalFree(lpwszArglist);
+
+	while (xlln_debug_pause && !IsDebuggerPresent())
+		Sleep(500L);
+
 	wchar_t mutex_name[40];
 	DWORD mutex_last_error;
 	HANDLE mutex = NULL;

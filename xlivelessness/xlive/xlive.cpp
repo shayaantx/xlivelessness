@@ -14,6 +14,8 @@
 // Link with iphlpapi.lib
 #include <iphlpapi.h>
 
+BOOL xlive_debug_pause = FALSE;
+
 BOOL xlive_users_info_changed[XLIVE_LOCAL_USER_COUNT];
 XUSER_SIGNIN_INFO* xlive_users_info[XLIVE_LOCAL_USER_COUNT];
 
@@ -262,7 +264,7 @@ BOOL XLivepIsPropertyIdValid(DWORD dwPropertyId, BOOL a2)
 
 
 // #472
-VOID WINAPI XCustomSetAction(DWORD dwActionIndex, LPCWSTR szActionText, DWORD dwFlags)
+VOID WINAPI XCustomSetAction(DWORD dwActionIndex, LPCWSTR lpwszActionText, DWORD dwFlags)
 {
 	TRACE_FX();
 }
@@ -366,8 +368,8 @@ DWORD WINAPI XGetOverlappedResult(PXOVERLAPPED pOverlapped, LPDWORD pdwResult, B
 HRESULT WINAPI XLiveInitialize(XLIVE_INITIALIZE_INFO *pPii)
 {
 	TRACE_FX();
-	//TODO startup flags.
-	while (FALSE && !IsDebuggerPresent())
+
+	while (xlive_debug_pause && !IsDebuggerPresent())
 		Sleep(500L);
 
 	srand((unsigned int)time(NULL));
@@ -535,7 +537,7 @@ HRESULT WINAPI XLiveGetUpdateInformation(PXLIVEUPDATE_INFORMATION pXLiveUpdateIn
 }
 
 // #5024
-HRESULT WINAPI XLiveUpdateSystem(LPCWSTR lpszRelaunchCmdLine)
+HRESULT WINAPI XLiveUpdateSystem(LPCWSTR lpwszRelaunchCmdLine)
 {
 	TRACE_FX();
 	return S_OK;
@@ -544,26 +546,26 @@ HRESULT WINAPI XLiveUpdateSystem(LPCWSTR lpszRelaunchCmdLine)
 }
 
 // #5026
-HRESULT WINAPI XLiveSetSponsorToken(LPCWSTR pwszToken, DWORD dwTitleId)
+HRESULT WINAPI XLiveSetSponsorToken(LPCWSTR lpwszToken, DWORD dwTitleId)
 {
 	TRACE_FX();
-	if (!pwszToken || wcsnlen_s(pwszToken, 30) != 29)
+	if (!lpwszToken || wcsnlen_s(lpwszToken, 30) != 29)
 		return E_INVALIDARG;
 	return S_OK;
 }
 
 // #5028
-DWORD WINAPI XLiveLoadLibraryEx(LPCWSTR pszModuleFileName, HINSTANCE *phModule, DWORD dwFlags)
+DWORD WINAPI XLiveLoadLibraryEx(LPCWSTR lpwszModuleFileName, HINSTANCE *phModule, DWORD dwFlags)
 {
 	TRACE_FX();
-	if (!pszModuleFileName)
+	if (!lpwszModuleFileName)
 		return E_POINTER;
-	if (!*pszModuleFileName)
+	if (!*lpwszModuleFileName)
 		return E_INVALIDARG;
 	if (!phModule)
 		return E_INVALIDARG;
 
-	HINSTANCE hInstance = LoadLibraryExW(pszModuleFileName, NULL, dwFlags);
+	HINSTANCE hInstance = LoadLibraryExW(lpwszModuleFileName, NULL, dwFlags);
 	if (!hInstance)
 		return E_INVALIDARG;
 
@@ -600,8 +602,8 @@ BOOL WINAPI XLivePreTranslateMessage(const LPMSG lpMsg)
 DWORD WINAPI XShowCustomPlayerListUI(
 	DWORD dwUserIndex,
 	DWORD dwFlags,
-	LPCWSTR pszTitle,
-	LPCWSTR pszDescription,
+	LPCWSTR lpwszTitle,
+	LPCWSTR lpwszDescription,
 	CONST BYTE *pbImage,
 	DWORD cbImage,
 	CONST XPLAYERLIST_USER *rgPlayers,
@@ -745,12 +747,12 @@ DWORD WINAPI XEnumerate(HANDLE hEnum, PVOID pvBuffer, DWORD cbBuffer, PDWORD pcI
 }
 
 // #5257
-HRESULT WINAPI XLiveManageCredentials(LPCWSTR lpszLiveIdName, LPCWSTR lpszLiveIdPassword, DWORD dwCredFlags, PXOVERLAPPED pXOverlapped)
+HRESULT WINAPI XLiveManageCredentials(LPCWSTR lpwszLiveIdName, LPCWSTR lpszLiveIdPassword, DWORD dwCredFlags, PXOVERLAPPED pXOverlapped)
 {
 	TRACE_FX();
 	if (dwCredFlags & XLMGRCREDS_FLAG_SAVE && dwCredFlags & XLMGRCREDS_FLAG_DELETE || !(dwCredFlags & XLMGRCREDS_FLAG_SAVE) && !(dwCredFlags & XLMGRCREDS_FLAG_DELETE))
 		return E_INVALIDARG;
-	if (!lpszLiveIdName || !*lpszLiveIdName)
+	if (!lpwszLiveIdName || !*lpwszLiveIdName)
 		return E_INVALIDARG;
 	if (dwCredFlags & XLMGRCREDS_FLAG_SAVE && (!lpszLiveIdPassword || !*lpszLiveIdPassword))
 		return E_INVALIDARG;
@@ -1381,7 +1383,7 @@ DWORD WINAPI XStorageBuildServerPath(
 	XSTORAGE_FACILITY StorageFacility,
 	CONST void *pvStorageFacilityInfo,
 	DWORD dwStorageFacilityInfoSize,
-	LPCWSTR *pwszItemName,
+	LPCWSTR *lpwszItemName,
 	WCHAR *pwszServerPath,
 	DWORD *pdwServerPathLength)
 {
@@ -1392,9 +1394,9 @@ DWORD WINAPI XStorageBuildServerPath(
 		return ERROR_NOT_LOGGED_ON;
 	if (!pvStorageFacilityInfo && dwStorageFacilityInfoSize)
 		return ERROR_INVALID_PARAMETER;
-	if (!pwszItemName)
+	if (!lpwszItemName)
 		return ERROR_INVALID_PARAMETER;
-	if (!*pwszItemName)
+	if (!*lpwszItemName)
 		return ERROR_INVALID_PARAMETER;
 	if (!pwszServerPath)
 		return ERROR_INVALID_PARAMETER;
