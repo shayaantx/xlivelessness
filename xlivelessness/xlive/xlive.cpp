@@ -13,6 +13,7 @@
 #include <vector>
 // Link with iphlpapi.lib
 #include <iphlpapi.h>
+#include "xuser.h"
 
 BOOL xlive_debug_pause = FALSE;
 
@@ -262,6 +263,11 @@ BOOL XLivepIsPropertyIdValid(DWORD dwPropertyId, BOOL a2)
 		|| !a2 && dwPropertyId == X_PROPERTY_GAMER_HOSTNAME;
 }
 
+int WINAPI XOnlineCleanup()
+{
+	//TODO: what is there to cleanup
+	return 0;
+}
 
 // #472
 VOID WINAPI XCustomSetAction(DWORD dwActionIndex, LPCWSTR lpwszActionText, DWORD dwFlags)

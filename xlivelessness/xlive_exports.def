@@ -8,6 +8,8 @@ EXPORTS
 	XSocketIOCTLSocket @6
 	XSocketSetSockOpt @7
 	XSocketGetSockOpt @8
+	XSocketGetSockName @9	
+	XSocketGetPeerName @10	
 	XSocketBind @11
 	XSocketConnect @12
 	XSocketListen @13
@@ -33,6 +35,8 @@ EXPORTS
 	XNetUnregisterInAddr @63
 	XNetConnect @65
 	XNetGetConnectStatus @66
+	XNetDnsLookup		 @67	
+	XNetDnsRelease		 @68	
 	XNetQosListen @69
 	XNetQosLookup @70
 	XNetQosRelease @72
@@ -87,23 +91,31 @@ EXPORTS
 	XUserSetProperty @5276
 	XUserSetContext @5277
 	XUserWriteAchievements @5278
-	XUserCreateAchievementEnumerator @5280
+	XUserCreateAchievementEnumerator @5280	
+	XUserReadStats					 @5281	
+	XUserCreateStatsEnumeratorByRank @5284	
+	XUserCreateStatsEnumeratorByXuid @5286	
 	XSessionCreate @5300
 	XStringVerify @5303
 	XStorageUploadFromMemory @5305
 	XStorageDelete @5308
 	XOnlineStartup @5310
-	XFriendsCreateEnumerator @5312
+	XOnlineCleanup @5311	
+	XFriendsCreateEnumerator @5312	
+	XInviteSend				 @5316	
 	XUserMuteListQuery @5314
 	XInviteGetAcceptedInfo @5315
 	XSessionStart @5318
+	XSessionModify @5322	
 	XSessionLeaveLocal @5325
 	XSessionJoinRemote @5326
-	XSessionJoinLocal @5327
+	XSessionJoinLocal @5327	
+	XSessionFlushStats @5329
 	XSessionDelete @5330
 	XUserReadProfileSettings @5331
 	XSessionEnd @5332
-	XSessionLeaveRemote @5336
+	XSessionLeaveRemote @5336	
+	XSessionModifySkill	@5342	
 	XStorageBuildServerPath @5344
 	XStorageDownloadToMemory @5345
 	

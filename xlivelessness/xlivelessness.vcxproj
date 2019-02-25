@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -85,7 +85,7 @@
     </ClCompile>
     <Link>
       <ModuleDefinitionFile>./xlive_exports.def</ModuleDefinitionFile>
-      <AdditionalDependencies>iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>iphlpapi.lib;ws2_32.lib;Dnsapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -109,7 +109,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <ModuleDefinitionFile>./xlive_exports.def</ModuleDefinitionFile>
-      <AdditionalDependencies>iphlpapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>iphlpapi.lib;ws2_32.lib;Dnsapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -128,14 +128,17 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="xlive\dnshelper.cpp" />
     <ClCompile Include="xlive\voice.cpp" />
     <ClCompile Include="xlive\xlive.cpp" />
     <ClCompile Include="xlive\xlocator.cpp" />
     <ClCompile Include="xlive\xnet.cpp" />
     <ClCompile Include="xlive\xnetqos.cpp" />
+    <ClCompile Include="xlive\xonline.cpp" />
     <ClCompile Include="xlive\xrender.cpp" />
     <ClCompile Include="xlive\xsession.cpp" />
     <ClCompile Include="xlive\xsocket.cpp" />
+    <ClCompile Include="xlive\xuser.cpp" />
     <ClCompile Include="xlln\DebugText.cpp" />
     <ClCompile Include="xlln\RandName.cpp" />
     <ClCompile Include="xlln\xlln.cpp" />
@@ -145,14 +148,17 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h" />
+    <ClInclude Include="xlive\dnshelper.h" />
     <ClInclude Include="xlive\voice.h" />
     <ClInclude Include="xlive\xdefs.h" />
     <ClInclude Include="xlive\xlive.h" />
     <ClInclude Include="xlive\xlocator.h" />
     <ClInclude Include="xlive\xnet.h" />
+    <ClInclude Include="xlive\xonline.h" />
     <ClInclude Include="xlive\xrender.h" />
     <ClInclude Include="xlive\xsession.h" />
     <ClInclude Include="xlive\xsocket.h" />
+    <ClInclude Include="xlive\xuser.h" />
     <ClInclude Include="xlln\DebugText.h" />
     <ClInclude Include="xlln\RandName.h" />
     <ClInclude Include="xlln\xlln.h" />

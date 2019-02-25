@@ -1,7 +1,10 @@
+#include <winsock2.h>
+#include <WinDNS.h>
 #include "xdefs.h"
 #include "xnet.h"
 #include "../xlln/DebugText.h"
 #include "xsocket.h"
+#include "dnshelper.h"
 
 BOOL xlive_net_initialized = FALSE;
 
@@ -10,6 +13,7 @@ CLocalUser xlive_local_users[16];
 std::map<DWORD, XNADDR*> xlive_users_secure;
 std::map<std::pair<DWORD, WORD>, XNADDR*> xlive_users_hostpair;
 
+DnsHelper dnsHelper;
 
 VOID CreateUser(XNADDR* pxna)
 {
@@ -43,6 +47,25 @@ void UnregisterSecureAddr(const IN_ADDR ina)
 	}
 }
 
+int WINAPI XSocketGetSockName(SOCKET s, struct sockaddr *name, int *namelen)
+{
+	return getsockname(s, name, namelen);
+}
+
+int WINAPI XSocketGetPeerName(SOCKET s, struct sockaddr *name, int *namelen)
+{
+	return getpeername(s, name, namelen);
+}
+
+int WINAPI XNetDnsLookup(const char *hostname, WSAEVENT onDnsLookupCompletedEvent, XNDNS** ppxndns)
+{
+	return dnsHelper.lookup(hostname, onDnsLookupCompletedEvent, ppxndns);
+}
+
+int WINAPI XNetDnsRelease(XNDNS* pxndns)
+{
+	return dnsHelper.release(pxndns);
+}
 
 // #51
 INT WINAPI XNetStartup(const XNetStartupParams *pxnsp)
