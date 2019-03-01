@@ -229,7 +229,6 @@ void CreateLocalUser()
 	//CreateUser(pAddr, TRUE);
 }
 
-
 void Check_Overlapped(PXOVERLAPPED pOverlapped)
 {
 	if (!pOverlapped)
@@ -266,7 +265,83 @@ BOOL XLivepIsPropertyIdValid(DWORD dwPropertyId, BOOL a2)
 int WINAPI XOnlineCleanup()
 {
 	//TODO: what is there to cleanup
+	TRACE_FX();
 	return 0;
+}
+
+HRESULT _stdcall XLiveSetDebugLevel(
+	XLIVE_DEBUG_LEVEL xdlLevel,
+	XLIVE_DEBUG_LEVEL *pxdlOldLevel
+)
+{
+	TRACE_FX();
+	return 0;
+}
+
+DWORD XShowAchievementsUI(DWORD dwUserIndex)
+{
+	TRACE_FX();
+	return 1;
+}
+
+DWORD XShowFriendsUI(DWORD dwUserIndex)
+{
+	TRACE_FX();
+	return 1;
+}
+
+DWORD XShowFriendRequestUI(DWORD dwUserIndex, XUID xuidUser)
+{
+	TRACE_FX();
+	return 1;
+}
+
+DWORD XShowGameInviteUI(DWORD dwUserIndex, const XUID * pXuidRecipients, DWORD cRecipients, LPCWSTR wszUnused)
+{
+	TRACE_FX();
+	return 1;
+}
+
+DWORD XShowMessageComposeUI(DWORD dwUserIndex, const XUID * pXuidRecipients, DWORD cRecipients, LPCWSTR wszText)
+{
+	TRACE_FX();
+	return 1;
+}
+
+DWORD XShowMessagesUI(DWORD dwUserIndex)
+{
+	TRACE_FX();
+	return 1;
+}
+
+DWORD XShowPlayerReviewUI(DWORD dwUserIndex, XUID XuidFeedbackTarget)
+{
+	TRACE_FX();
+	return 1;
+}
+
+DWORD XShowPlayersUI(DWORD dwUserIndex)
+{
+	TRACE_FX();
+	return 1;
+}
+
+DWORD XUserAreUsersFriends(DWORD dwUserIndex, PXUID pXuids, DWORD dwXuidCount, PBOOL pfResult, PXOVERLAPPED pOverlapped)
+{
+	TRACE_FX();
+	return 1;
+}
+
+HRESULT XLiveOnDestroyDevice()
+{
+	TRACE_FX();
+	return S_OK;
+}
+
+DWORD WINAPI XNotifyPositionUI(DWORD dwPosition)
+{
+	TRACE_FX();
+	return S_OK;
 }
 
 // #472

@@ -46,6 +46,7 @@ EXPORTS
 	XCustomSetAction @472
 	XCustomGetLastActionPress @473
 	XNotifyGetNext @651
+	XNotifyPositionUI @652
 	XNotifyDelayUI @653
 	XGetOverlappedExtendedError @1082
 	XGetOverlappedResult @1083
@@ -53,6 +54,7 @@ EXPORTS
 	XLiveInput @5001
 	XLiveRender @5002
 	XLiveUninitialize @5003
+	XLiveOnDestroyDevice @5006
 	XLiveOnResetDevice @5007
 	XHVCreateEngine @5008
 	XLiveRegisterDataSection @5010
@@ -65,9 +67,16 @@ EXPORTS
 	XLiveSetSponsorToken @5026
 	XLiveLoadLibraryEx @5028
 	XLiveFreeLibrary @5029
-	XLivePreTranslateMessage @5030
+	XLivePreTranslateMessage @5030	
+	XLiveSetDebugLevel @5031
+	XShowMessagesUI @5206	
+	XShowGameInviteUI @5208	
+	XShowMessageComposeUI @5209
+	XShowFriendRequestUI @5210	
 	XShowCustomPlayerListUI @5212
+	XShowPlayerReviewUI @5214
 	XShowGuideUI @5215
+	XShowKeyboardUI	@5216	
 	XLocatorServerAdvertise @5230
 	XLocatorServerUnAdvertise @5231
 	XLocatorGetServiceProperty @5233
@@ -75,6 +84,7 @@ EXPORTS
 	XLocatorServiceInitialize @5236
 	XLocatorServiceUnInitialize @5237
 	XLocatorCreateKey @5238
+	XShowAchievementsUI @5250	
 	XCloseHandle @5251
 	XShowGamerCardUI @5252
 	XCancelOverlapped @5254
@@ -86,8 +96,13 @@ EXPORTS
 	XUserGetXUID @5261
 	XUserGetSigninState @5262
 	XUserGetName @5263
+	XUserAreUsersFriends @5264
 	XUserCheckPrivilege @5265
+	XUserGetSigninInfo @5267	
 	XNotifyCreateListener @5270
+	XShowPlayersUI @5271	
+	XUserAwardGamerPicture @5274	
+	XShowFriendsUI	@5275	
 	XUserSetProperty @5276
 	XUserSetContext @5277
 	XUserWriteAchievements @5278
@@ -95,6 +110,8 @@ EXPORTS
 	XUserReadStats					 @5281	
 	XUserCreateStatsEnumeratorByRank @5284	
 	XUserCreateStatsEnumeratorByXuid @5286	
+	XUserSetContextEx @5292	
+	XUserSetPropertyEx	@5293	
 	XSessionCreate @5300
 	XStringVerify @5303
 	XStorageUploadFromMemory @5305
@@ -102,11 +119,17 @@ EXPORTS
 	XOnlineStartup @5310
 	XOnlineCleanup @5311	
 	XFriendsCreateEnumerator @5312	
+	XUserMuteListQuery @5314	
+	XInviteGetAcceptedInfo @5315
 	XInviteSend				 @5316	
 	XUserMuteListQuery @5314
 	XInviteGetAcceptedInfo @5315
+	XSessionWriteStats @5317	
 	XSessionStart @5318
+	XSessionSearchByID @5320
+	XSessionSearch	@5321	
 	XSessionModify @5322	
+	XOnlineGetNatType @5324	
 	XSessionLeaveLocal @5325
 	XSessionJoinRemote @5326
 	XSessionJoinLocal @5327	
@@ -114,7 +137,9 @@ EXPORTS
 	XSessionDelete @5330
 	XUserReadProfileSettings @5331
 	XSessionEnd @5332
+	XSessionArbitrationRegister	@5333	
 	XSessionLeaveRemote @5336	
+	XUserWriteProfileSettings @5337	
 	XSessionModifySkill	@5342	
 	XStorageBuildServerPath @5344
 	XStorageDownloadToMemory @5345

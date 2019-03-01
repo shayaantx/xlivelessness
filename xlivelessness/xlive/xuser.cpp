@@ -21,3 +21,49 @@ DWORD WINAPI XUserReadStats(DWORD dwTitleId, DWORD dwNumXuids, CONST XUID *pXuid
 	TRACE_FX();
 	return ERROR_SUCCESS;
 }
+
+DWORD XUserCreateStatsEnumeratorByXuid(DWORD dwTitleId, XUID XuidPivot, DWORD dwNumRows, DWORD dwNumStatsSpecs, const XUSER_STATS_SPEC * pSpecs, PDWORD * pcbBuffer, PHANDLE * ph)
+{
+	TRACE_FX();
+	return 0;
+}
+
+DWORD XUserAwardGamerPicture(
+	DWORD dwUserIndex,
+	DWORD dwPictureId,
+	DWORD dwReserved,
+	PXOVERLAPPED pXOverlapped
+)
+{
+	TRACE_FX();
+	return 0;
+}
+
+DWORD XUserWriteProfileSettings(
+	DWORD dwUserIndex,
+	DWORD dwNumSettings,
+	const PXUSER_PROFILE_SETTING pSettings,
+	PXOVERLAPPED pXOverlapped
+) 
+{
+	TRACE_FX();
+	return 0;
+}
+
+DWORD XUserGetSigninInfo(DWORD dwUserIndex, DWORD dwFlags, PXUSER_SIGNIN_INFO pSigninInfo)
+{
+	TRACE_FX();
+	return 1;
+}
+
+DWORD XUserSetContextEx(DWORD dwUserIndex, DWORD dwContextId, DWORD dwContextValue, PXOVERLAPPED pOverlapped)
+{
+	TRACE_FX();
+	return ERROR_IO_PENDING;
+}
+
+DWORD XUserSetPropertyEx(DWORD dwUserIndex, DWORD dwPropertyId, DWORD cbValue, const VOID * pvValue, PXOVERLAPPED pOverlapped)
+{
+	TRACE_FX();
+	return ERROR_IO_PENDING;
+}

@@ -231,3 +231,9 @@ INT WINAPI XNetSetSystemLinkPort(WORD wSystemLinkPort)
 
 	return ERROR_SUCCESS;
 }
+
+XONLINE_NAT_TYPE WINAPI XOnlineGetNatType()
+{
+	TRACE_FX();
+	return XONLINE_NAT_OPEN;
+}

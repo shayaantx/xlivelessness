@@ -17,3 +17,5 @@ VOID CreateUser(XNADDR* pxna);
 HRESULT WINAPI XNetCreateKey(XNKID *pxnkid, XNKEY *pxnkey);
 int WINAPI XSocketGetSockName(SOCKET s, struct sockaddr *name, int *namelen);
 int WINAPI XSocketGetPeerName(SOCKET s, struct sockaddr *name, int *namelen);
+
+XONLINE_NAT_TYPE WINAPI XOnlineGetNatType();
