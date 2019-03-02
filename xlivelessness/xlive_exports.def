@@ -36,7 +36,7 @@ EXPORTS
 	XNetConnect @65
 	XNetGetConnectStatus @66
 	XNetDnsLookup		 @67	
-	XNetDnsRelease		 @68	
+	XNetDnsRelease		 @68
 	XNetQosListen @69
 	XNetQosLookup @70
 	XNetQosRelease @72
@@ -54,6 +54,7 @@ EXPORTS
 	XLiveInput @5001
 	XLiveRender @5002
 	XLiveUninitialize @5003
+	XLiveOnCreateDevice @5005
 	XLiveOnDestroyDevice @5006
 	XLiveOnResetDevice @5007
 	XHVCreateEngine @5008
@@ -77,6 +78,16 @@ EXPORTS
 	XShowPlayerReviewUI @5214
 	XShowGuideUI @5215
 	XShowKeyboardUI	@5216	
+	XLivePreTranslateMessage @5030
+	XLiveSetDebugLevel @5031
+	XShowMessagesUI @5206
+	XShowGameInviteUI @5208
+	XShowMessageComposeUI @5209
+	XShowFriendRequestUI @5210
+	XShowCustomPlayerListUI @5212
+	XShowPlayerReviewUI @5214
+	XShowGuideUI @5215
+	XShowKeyboardUI @5216
 	XLocatorServerAdvertise @5230
 	XLocatorServerUnAdvertise @5231
 	XLocatorGetServiceProperty @5233
@@ -84,7 +95,7 @@ EXPORTS
 	XLocatorServiceInitialize @5236
 	XLocatorServiceUnInitialize @5237
 	XLocatorCreateKey @5238
-	XShowAchievementsUI @5250	
+	XShowAchievementsUI @5250
 	XCloseHandle @5251
 	XShowGamerCardUI @5252
 	XCancelOverlapped @5254
@@ -98,51 +109,50 @@ EXPORTS
 	XUserGetName @5263
 	XUserAreUsersFriends @5264
 	XUserCheckPrivilege @5265
-	XUserGetSigninInfo @5267	
+	XUserGetSigninInfo @5267
 	XNotifyCreateListener @5270
-	XShowPlayersUI @5271	
-	XUserAwardGamerPicture @5274	
-	XShowFriendsUI	@5275	
+	XShowPlayersUI @5271
+	XUserAwardGamerPicture @5274
+	XShowFriendsUI @5275
 	XUserSetProperty @5276
 	XUserSetContext @5277
 	XUserWriteAchievements @5278
-	XUserCreateAchievementEnumerator @5280	
-	XUserReadStats					 @5281	
-	XUserCreateStatsEnumeratorByRank @5284	
-	XUserCreateStatsEnumeratorByXuid @5286	
-	XUserSetContextEx @5292	
-	XUserSetPropertyEx	@5293	
+	XUserCreateAchievementEnumerator @5280
+	XUserReadStats @5281
+	XUserCreateStatsEnumeratorByRank @5284
+	XUserCreateStatsEnumeratorByXuid @5286
+	XUserSetContextEx @5292
+	XUserSetPropertyEx @5293
 	XSessionCreate @5300
 	XStringVerify @5303
 	XStorageUploadFromMemory @5305
 	XStorageDelete @5308
 	XOnlineStartup @5310
-	XOnlineCleanup @5311	
-	XFriendsCreateEnumerator @5312	
-	XUserMuteListQuery @5314	
-	XInviteGetAcceptedInfo @5315
-	XInviteSend				 @5316	
+	XOnlineCleanup @5311
+	XFriendsCreateEnumerator @5312
 	XUserMuteListQuery @5314
 	XInviteGetAcceptedInfo @5315
-	XSessionWriteStats @5317	
+	XInviteSend @5316
+	XSessionWriteStats @5317
 	XSessionStart @5318
 	XSessionSearchByID @5320
-	XSessionSearch	@5321	
-	XSessionModify @5322	
-	XOnlineGetNatType @5324	
+	XSessionSearch @5321
+	XSessionModify @5322
+	XOnlineGetNatType @5324
 	XSessionLeaveLocal @5325
 	XSessionJoinRemote @5326
-	XSessionJoinLocal @5327	
+	XSessionJoinLocal @5327
 	XSessionFlushStats @5329
 	XSessionDelete @5330
 	XUserReadProfileSettings @5331
 	XSessionEnd @5332
-	XSessionArbitrationRegister	@5333	
-	XSessionLeaveRemote @5336	
-	XUserWriteProfileSettings @5337	
-	XSessionModifySkill	@5342	
+	XSessionArbitrationRegister @5333
+	XSessionLeaveRemote @5336
+	XUserWriteProfileSettings @5337
+	XSessionModifySkill @5342
 	XStorageBuildServerPath @5344
 	XStorageDownloadToMemory @5345
-	
 	XLLNLogin @41140
 	XLLNLogout @41141
+	XLLNModifyProperty @41142
+	XLLNDebugLog @41143

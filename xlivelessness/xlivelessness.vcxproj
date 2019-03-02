@@ -137,6 +137,7 @@
     <ClCompile Include="xlive\xonline.cpp" />
     <ClCompile Include="xlive\xrender.cpp" />
     <ClCompile Include="xlive\xsession.cpp" />
+    <ClCompile Include="xlive\xshow.cpp" />
     <ClCompile Include="xlive\xsocket.cpp" />
     <ClCompile Include="xlive\xuser.cpp" />
     <ClCompile Include="xlln\DebugText.cpp" />
@@ -157,6 +158,7 @@
     <ClInclude Include="xlive\xonline.h" />
     <ClInclude Include="xlive\xrender.h" />
     <ClInclude Include="xlive\xsession.h" />
+    <ClInclude Include="xlive\xshow.h" />
     <ClInclude Include="xlive\xsocket.h" />
     <ClInclude Include="xlive\xuser.h" />
     <ClInclude Include="xlln\DebugText.h" />

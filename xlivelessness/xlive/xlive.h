@@ -84,3 +84,4 @@ DWORD XUserAreUsersFriends(
 	PBOOL pfResult,
 	PXOVERLAPPED pOverlapped
 );
+extern BOOL xlive_online_initialized;

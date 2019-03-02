@@ -428,9 +428,6 @@ typedef struct
 //INT WINAPI XNetGetConnectStatus(const IN_ADDR ina);
 
 
-//INT   WINAPI XNetDnsLookup(const char * pszHost, WSAEVENT hEvent, XNDNS ** ppxndns);
-//INT   WINAPI XNetDnsRelease(XNDNS * pxndns);
-
 #define XNET_GET_XNADDR_PENDING             0x00000000 // Address acquisition is not yet complete
 #define XNET_GET_XNADDR_NONE                0x00000001 // XNet is uninitialized or no debugger found
 #define XNET_GET_XNADDR_ETHERNET            0x00000002 // Host has ethernet address (no IP address)
@@ -1368,5 +1365,17 @@ typedef struct _XLOCATOR_SEARCHRESULT {
 #define XLSIGNIN_FLAG_SAVECREDS 1
 #define XLSIGNIN_FLAG_ALLOWTITLEUPDATES 2
 #define XLSIGNIN_FLAG_ALLOWSYSTEMUPDATES 4
+
+
+
+typedef enum _XLIVE_DEBUG_LEVEL
+{
+	XLIVE_DEBUG_LEVEL_OFF = 0, // No debug output.
+	XLIVE_DEBUG_LEVEL_ERROR, // Error only debug output.
+	XLIVE_DEBUG_LEVEL_WARNING, // Warning and error debug output.
+	XLIVE_DEBUG_LEVEL_INFO, // Information, warning and error debug output.
+	XLIVE_DEBUG_LEVEL_DEFAULT // Default level of debug output, set as the current registry value.
+} XLIVE_DEBUG_LEVEL;
+
 
 #endif

@@ -66,6 +66,9 @@
     <ClCompile Include="xlive\dnshelper.cpp">
       <Filter>Source Files\xlive</Filter>
     </ClCompile>
+    <ClCompile Include="xlive\xshow.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="xlln\DebugText.h">
@@ -111,6 +114,9 @@
       <Filter>Source Files\xlive</Filter>
     </ClInclude>
     <ClInclude Include="xlive\dnshelper.h">
+      <Filter>Source Files\xlive</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\xshow.h">
       <Filter>Source Files\xlive</Filter>
     </ClInclude>
   </ItemGroup>

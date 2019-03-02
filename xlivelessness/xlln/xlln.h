@@ -16,6 +16,7 @@
 #define MYWINDOW_TBX_TEST   (WM_APP + 122)
 #define MYWINDOW_CHK_LIVEENABLE   (WM_APP + 123)
 #define MYWINDOW_BTN_LOGOUT   (WM_APP + 124)
+#define MYWINDOW_BTN_TEST   (WM_APP + 125)
 
 DWORD WINAPI XLLNLogin(DWORD dwUserIndex, BOOL bLiveEnabled, DWORD dwUserId, const CHAR *szUsername);
 DWORD WINAPI XLLNLogout(DWORD dwUserIndex);

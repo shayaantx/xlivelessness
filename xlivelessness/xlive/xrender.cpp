@@ -14,13 +14,6 @@ DWORD xlive_fps_limit = 60;
 
 static std::chrono::system_clock::time_point nextFrame;
 static std::chrono::system_clock::duration desiredRenderTime;
-void frameTimeManagement()
-{
-	std::this_thread::sleep_until(nextFrame);
-	do {
-		nextFrame += desiredRenderTime;
-	} while (std::chrono::system_clock::now() > nextFrame);
-}
 
 INT InitXRender(XLIVE_INITIALIZE_INFO* pPii)
 {
@@ -28,8 +21,7 @@ INT InitXRender(XLIVE_INITIALIZE_INFO* pPii)
 	pDevice = (LPDIRECT3DDEVICE9)pPii->pD3D;
 	pD3DPP = (D3DPRESENT_PARAMETERS*)pPii->pD3DPP;
 
-	nextFrame = std::chrono::system_clock::now();
-	desiredRenderTime = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::duration<double>(1.0 / (double)xlive_fps_limit));
+	SetFPSLimit(xlive_fps_limit);
 
 	Initialised_XRender = TRUE;
 	return S_OK;
@@ -39,6 +31,21 @@ INT UninitXRender()
 {
 	TRACE_FX();
 	return S_OK;
+}
+
+VOID SetFPSLimit(DWORD fps_limit)
+{
+	xlive_fps_limit = fps_limit;
+	nextFrame = std::chrono::system_clock::now();
+	desiredRenderTime = std::chrono::duration_cast<std::chrono::system_clock::duration>(std::chrono::duration<double>(1.0 / (double)fps_limit));
+}
+
+void frameTimeManagement()
+{
+	std::this_thread::sleep_until(nextFrame);
+	do {
+		nextFrame += desiredRenderTime;
+	} while (std::chrono::system_clock::now() > nextFrame);
 }
 
 // #5002

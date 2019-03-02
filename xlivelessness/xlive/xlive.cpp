@@ -7,6 +7,7 @@
 #include "../xlln/xlln.h"
 #include "xsocket.h"
 #include "xlocator.h"
+#include "xsession.h"
 #include <time.h>
 #include <d3d9.h>
 #include <string>
@@ -27,14 +28,15 @@ struct NOTIFY_LISTENER {
 static NOTIFY_LISTENER g_listener[50];
 static int g_dwListener = 0;
 
-static XSESSION_LOCAL_DETAILS xlive_session_details;
-
-static bool xlive_invite_to_game = false;
+bool xlive_invite_to_game = false;
 
 static CRITICAL_SECTION d_lock;
 
 static char* xlive_preferred_network_adapter_name = NULL;
 EligibleAdapter xlive_network_adapter;
+
+BOOL xlive_online_initialized = FALSE;
+XLIVE_DEBUG_LEVEL xlive_xdlLevel = XLIVE_DEBUG_LEVEL_OFF;
 
 INT GetNetworkAdapter()
 {
@@ -357,57 +359,90 @@ BOOL WINAPI XCustomGetLastActionPress(DWORD *pdwUserIndex, DWORD *pdwActionIndex
 	return FALSE;
 }
 
+BOOL XNotifyGetNextHelper(ULONGLONG notificationArea, PDWORD pdwId, PULONG_PTR pParam)
+{
+	if (notificationArea & XNOTIFY_SYSTEM) {
+
+		*pParam = 0x00000000;
+
+		for (int i = 0; i < XLIVE_LOCAL_USER_COUNT; i++) {
+			if (xlive_users_info_changed[i]) {
+				xlive_users_info_changed[i] = FALSE;
+				*pParam |= 1 << i;
+			}
+		}
+
+		if (*pParam) {
+			*pdwId = XN_SYS_SIGNINCHANGED;
+			return TRUE;
+		}
+	}
+	if (false && notificationArea & XNOTIFY_SYSTEM) {
+
+		//*pParam = XONLINE_S_LOGON_CONNECTION_ESTABLISHED;
+		*pParam = XONLINE_S_LOGON_DISCONNECTED;
+
+		if (*pParam) {
+			*pdwId = XN_LIVE_CONNECTIONCHANGED;
+			return TRUE;
+		}
+	}
+	if (notificationArea & XNOTIFY_LIVE) {
+		if (xlive_invite_to_game) {
+			*pdwId = XN_LIVE_INVITE_ACCEPTED;
+			*pParam = 0x00000000;
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 // #651
 BOOL WINAPI XNotifyGetNext(HANDLE hNotification, DWORD dwMsgFilter, PDWORD pdwId, PULONG_PTR pParam)
 {
 	TRACE_FX();
-
 	EnterCriticalSection(&d_lock);
-
 	ResetEvent(hNotification);
 
 	BOOL result = FALSE;
+
 	int noteId = 0;
 	for (; noteId < g_dwListener; noteId++) {
 		if (g_listener[noteId].id == hNotification)
 			break;
 	}
 	if (noteId == g_dwListener) {
-		noteId = -1;
+		//noteId = -1;
+		__debugbreak();
 	}
 	else {
-		if (g_listener[noteId].area & XNOTIFY_SYSTEM) {
-
-			*pParam = 0x00000000;
-			
-			for (int i = 0; i < XLIVE_LOCAL_USER_COUNT; i++) {
-				if (xlive_users_info_changed[i]) {
-					xlive_users_info_changed[i] = FALSE;
-					*pParam |= 1 << i;
-				}
-			}
-
-			if (*pParam) {
-				*pdwId = XN_SYS_SIGNINCHANGED;
-				result = TRUE;
-			}
-		}
-		else if (g_listener[noteId].area & XNOTIFY_SYSTEM) {
-
-			//*pParam = XONLINE_S_LOGON_CONNECTION_ESTABLISHED;
-			*pParam = XONLINE_S_LOGON_DISCONNECTED;
-
-			if (*pParam) {
-				*pdwId = XN_LIVE_CONNECTIONCHANGED;
-				result = TRUE;
-			}
-		}
+		result = XNotifyGetNextHelper(dwMsgFilter ? dwMsgFilter : g_listener[noteId].area, pdwId, pParam);
 	}
 
 	if (result)
 		SetEvent(hNotification);
 	LeaveCriticalSection(&d_lock);
 	return result;
+}
+
+#define XNOTIFYUI_POS_TOPLEFT ?
+#define XNOTIFYUI_POS_TOPCENTER ?
+#define XNOTIFYUI_POS_TOPRIGHT ?
+#define XNOTIFYUI_POS_CENTERLEFT ?
+#define XNOTIFYUI_POS_CENTER ?
+#define XNOTIFYUI_POS_CENTERRIGHT ?
+#define XNOTIFYUI_POS_BOTTOMLEFT ?
+#define XNOTIFYUI_POS_BOTTOMCENTER ?
+#define XNOTIFYUI_POS_BOTTOMRIGHT ?
+
+// #652
+VOID WINAPI XNotifyPositionUI(DWORD dwPosition)
+{
+	TRACE_FX();
+	// Invalid dwPos--check XNOTIFYUI_POS_* bits.  Do not specify both TOP and BOTTOM or both LEFT and RIGHT.
+	if (dwPosition & 0xFFFFFFF0 || dwPosition & 1 && dwPosition & 2 || dwPosition & 8 && dwPosition & 4)
+		return;
+	// TODO XNotifyPositionUI
 }
 
 // #653
@@ -450,8 +485,9 @@ HRESULT WINAPI XLiveInitialize(XLIVE_INITIALIZE_INFO *pPii)
 {
 	TRACE_FX();
 
-	while (xlive_debug_pause && !IsDebuggerPresent())
+	while (xlive_debug_pause && !IsDebuggerPresent()) {
 		Sleep(500L);
+	}
 
 	srand((unsigned int)time(NULL));
 
@@ -470,8 +506,6 @@ HRESULT WINAPI XLiveInitialize(XLIVE_INITIALIZE_INFO *pPii)
 		xlive_users_info_changed[i] = FALSE;
 	}
 
-	memset(&xlive_session_details, 0, sizeof(XSESSION_LOCAL_DETAILS));
-
 	InitializeCriticalSection(&d_lock);
 	InitializeCriticalSection(&xlive_xlocator_enumerators_lock);
 
@@ -479,8 +513,9 @@ HRESULT WINAPI XLiveInitialize(XLIVE_INITIALIZE_INFO *pPii)
 	DWORD mutex_last_error;
 	HANDLE mutex = NULL;
 	do {
-		if (mutex)
+		if (mutex) {
 			mutex_last_error = CloseHandle(mutex);
+		}
 		xlive_base_port += 1000;
 		if (xlive_base_port > 65000) {
 			xlive_netsocket_abort = TRUE;
@@ -500,6 +535,7 @@ HRESULT WINAPI XLiveInitialize(XLIVE_INITIALIZE_INFO *pPii)
 
 	//TODO If the title's graphics system has not yet been initialized, D3D will be passed in XLiveOnCreateDevice(...).
 	INT error_XRender = InitXRender(pPii);
+	INT error_XSession = InitXSession();
 
 	return S_OK;
 }
@@ -508,6 +544,8 @@ HRESULT WINAPI XLiveInitialize(XLIVE_INITIALIZE_INFO *pPii)
 HRESULT WINAPI XLiveInput(XLIVE_INPUT_INFO *pPii)
 {
 	TRACE_FX();
+	if (!pPii)
+		return E_POINTER;
 	pPii->fHandled = FALSE;
 	return S_OK;
 }
@@ -519,6 +557,25 @@ VOID WINAPI XLiveUninitialize()
 	INT error_XRender = UninitXRender();
 	DeleteCriticalSection(&xlive_xlocator_enumerators_lock);
 	DeleteCriticalSection(&d_lock);
+}
+
+// #5005
+HRESULT WINAPI XLiveOnCreateDevice(IUnknown *pD3D, VOID *pD3DPP)
+{
+	TRACE_FX();
+	if (!pD3D)
+		return E_POINTER;
+	if (!pD3DPP)
+		return E_POINTER;
+	//TODO XLiveOnCreateDevice
+	return S_OK;
+}
+
+// #5006
+HRESULT WINAPI XLiveOnDestroyDevice()
+{
+	TRACE_FX();
+	return S_OK;
 }
 
 // #5007
@@ -679,31 +736,17 @@ BOOL WINAPI XLivePreTranslateMessage(const LPMSG lpMsg)
 	//return TRUE;
 }
 
-// #5212
-DWORD WINAPI XShowCustomPlayerListUI(
-	DWORD dwUserIndex,
-	DWORD dwFlags,
-	LPCWSTR lpwszTitle,
-	LPCWSTR lpwszDescription,
-	CONST BYTE *pbImage,
-	DWORD cbImage,
-	CONST XPLAYERLIST_USER *rgPlayers,
-	DWORD cPlayers,
-	CONST XPLAYERLIST_BUTTON *pXButton,
-	CONST XPLAYERLIST_BUTTON *pYButton,
-	XPLAYERLIST_RESULT *pResult,
-	XOVERLAPPED *pOverlapped)
+// #5031
+HRESULT WINAPI XLiveSetDebugLevel(XLIVE_DEBUG_LEVEL xdlLevel, XLIVE_DEBUG_LEVEL *pxdlOldLevel)
 {
 	TRACE_FX();
-	return ERROR_SUCCESS;
-}
-
-// #5215
-DWORD WINAPI XShowGuideUI(DWORD dwUserIndex)
-{
-	TRACE_FX();
-	ShowXLLN(XLLN_SHOW_HOME);
-	return ERROR_SUCCESS;
+	if (xdlLevel != XLIVE_DEBUG_LEVEL_OFF && xdlLevel != XLIVE_DEBUG_LEVEL_ERROR && xdlLevel != XLIVE_DEBUG_LEVEL_WARNING && xdlLevel != XLIVE_DEBUG_LEVEL_INFO && xdlLevel != XLIVE_DEBUG_LEVEL_DEFAULT)
+		return E_INVALIDARG;
+	if (pxdlOldLevel) {
+		*pxdlOldLevel = xlive_xdlLevel;
+	}
+	xlive_xdlLevel = xdlLevel;
+	return S_OK;
 }
 
 // #5251
@@ -724,18 +767,6 @@ BOOL WINAPI XCloseHandle(HANDLE hObject)
 		return FALSE;
 	}
 	return TRUE;
-}
-
-// #5252
-DWORD WINAPI XShowGamerCardUI(DWORD dwUserIndex, XUID XuidPlayer)
-{
-	TRACE_FX();
-	if (dwUserIndex >= XLIVE_LOCAL_USER_COUNT)
-		return ERROR_NO_SUCH_USER;
-	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
-		return ERROR_NOT_LOGGED_ON;
-
-	return ERROR_SUCCESS;
 }
 
 // #5254
@@ -917,26 +948,6 @@ HRESULT WINAPI XLiveSignin(PWSTR pszLiveIdName, PWSTR pszLiveIdPassword, DWORD d
 	return S_OK;
 }
 
-// #5260
-DWORD WINAPI XShowSigninUI(DWORD cPanes, DWORD dwFlags)
-{
-	TRACE_FX();
-	if (!(!(dwFlags & 0x40FFFC) && (!(dwFlags & XSSUI_FLAGS_LOCALSIGNINONLY) || !(dwFlags & XSSUI_FLAGS_SHOWONLYONLINEENABLED)))) {
-		return ERROR_INVALID_PARAMETER;
-	}
-
-	// Number of users to sign in.
-	if (!cPanes)
-		return ERROR_INVALID_PARAMETER;
-
-	ShowXLLN(XLLN_SHOW_LOGIN);
-
-	//TODO XShowSigninUI
-	return ERROR_SUCCESS;
-	// no users signed in with multiplayer privilege. if XSSUI_FLAGS_SHOWONLYONLINEENABLED is flagged?
-	return ERROR_FUNCTION_FAILED;
-}
-
 // #5261
 DWORD WINAPI XUserGetXUID(DWORD dwUserIndex, XUID *pxuid)
 {
@@ -945,12 +956,14 @@ DWORD WINAPI XUserGetXUID(DWORD dwUserIndex, XUID *pxuid)
 		return ERROR_INVALID_PARAMETER;
 	if (dwUserIndex >= XLIVE_LOCAL_USER_COUNT)
 		return ERROR_NO_SUCH_USER;
+	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
+		return ERROR_NOT_LOGGED_ON;
 
 	if (xlive_users_info[dwUserIndex]->UserSigninState & (eXUserSigninState_SignedInLocally | eXUserSigninState_SignedInToLive)) {
 		*pxuid = xlive_users_info[dwUserIndex]->xuid;
 		return ERROR_SUCCESS;
 	}
-	return ERROR_NO_SUCH_USER;
+	return ERROR_NOT_LOGGED_ON;
 }
 
 // #5262
@@ -972,12 +985,21 @@ DWORD WINAPI XUserGetName(DWORD dwUserIndex, LPSTR szUserName, DWORD cchUserName
 		return ERROR_INVALID_PARAMETER;
 	if (dwUserIndex >= XLIVE_LOCAL_USER_COUNT)
 		return ERROR_NO_SUCH_USER;
+	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
+		return ERROR_NOT_LOGGED_ON;
 
 	if (cchUserName > XUSER_NAME_SIZE)
 		cchUserName = XUSER_NAME_SIZE;
 
 	memcpy(szUserName, xlive_users_info[dwUserIndex]->szUserName, cchUserName);
 	return ERROR_SUCCESS;
+}
+
+// #5264
+VOID XUserAreUsersFriends()
+{
+	TRACE_FX();
+	__debugbreak();
 }
 
 // #5265
@@ -1013,6 +1035,13 @@ DWORD WINAPI XUserCheckPrivilege(DWORD dwUserIndex, XPRIVILEGE_TYPE PrivilegeTyp
 	return ERROR_SUCCESS;
 }
 
+// #5267
+VOID XUserGetSigninInfo()
+{
+	TRACE_FX();
+	__debugbreak();
+}
+
 // #5270: Requires XNotifyGetNext to process the listener.
 HANDLE WINAPI XNotifyCreateListener(ULONGLONG qwAreas)
 {
@@ -1028,6 +1057,13 @@ HANDLE WINAPI XNotifyCreateListener(ULONGLONG qwAreas)
 
 	SetEvent(g_dwFakeListener);
 	return g_dwFakeListener;
+}
+
+// #5274
+VOID XUserAwardGamerPicture()
+{
+	TRACE_FX();
+	__debugbreak();
 }
 
 // #5276
@@ -1138,68 +1174,46 @@ DWORD WINAPI XUserCreateAchievementEnumerator(DWORD dwTitleId, DWORD dwUserIndex
 	return ERROR_SUCCESS;
 }
 
-// #5300
-DWORD WINAPI XSessionCreate(DWORD dwFlags, DWORD dwUserIndex, DWORD dwMaxPublicSlots, DWORD dwMaxPrivateSlots, ULONGLONG *pqwSessionNonce, PXSESSION_INFO pSessionInfo, PXOVERLAPPED pXOverlapped, PHANDLE phEnum)
+// #5281
+DWORD WINAPI XUserReadStats(DWORD dwTitleId, DWORD dwNumXuids, CONST XUID *pXuids, DWORD dwNumStatsSpecs, CONST XUSER_STATS_SPEC *pSpecs, DWORD *pcbResults, XUSER_STATS_READ_RESULTS *pResults, XOVERLAPPED *pXOverlapped)
 {
 	TRACE_FX();
-	if (dwUserIndex >= XLIVE_LOCAL_USER_COUNT)
-		return ERROR_NO_SUCH_USER;
-	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
-		return ERROR_NOT_LOGGED_ON;
-	if (!pqwSessionNonce)
+	if (!dwNumXuids || dwNumXuids > 0x65)
 		return ERROR_INVALID_PARAMETER;
-	if (!pSessionInfo)
+	if (!pXuids)
 		return ERROR_INVALID_PARAMETER;
-	if (!phEnum)
+	if (!dwNumStatsSpecs || dwNumStatsSpecs > 0x40)
 		return ERROR_INVALID_PARAMETER;
-	if (dwFlags & ~(XSESSION_CREATE_USES_MASK | XSESSION_CREATE_MODIFIERS_MASK | 0x1000))//FIXME unknown macro or their mistake?
+	if (!pSpecs)
 		return ERROR_INVALID_PARAMETER;
-	if (dwFlags & XSESSION_CREATE_USES_MATCHMAKING && !(dwFlags & XSESSION_CREATE_USES_PEER_NETWORK))
+	if (!pcbResults)
 		return ERROR_INVALID_PARAMETER;
-	if (dwFlags & XSESSION_CREATE_USES_ARBITRATION && !(dwFlags & XSESSION_CREATE_USES_STATS))
+	if (*pcbResults && !pResults)
 		return ERROR_INVALID_PARAMETER;
-	if (dwFlags & XSESSION_CREATE_USES_ARBITRATION && !(dwFlags & XSESSION_CREATE_USES_PEER_NETWORK))
+	if (!*pcbResults && pResults)
 		return ERROR_INVALID_PARAMETER;
-	if (dwFlags & XSESSION_CREATE_HOST && !(dwFlags & (XSESSION_CREATE_USES_PEER_NETWORK | XSESSION_CREATE_USES_STATS | XSESSION_CREATE_USES_MATCHMAKING)))
-		return ERROR_INVALID_PARAMETER;
-	if (dwFlags & XSESSION_CREATE_MODIFIERS_MASK) {
-		if (!(dwFlags & (XSESSION_CREATE_USES_PRESENCE | XSESSION_CREATE_USES_MATCHMAKING))) {
-			return ERROR_INVALID_PARAMETER;
-		}
-		if (!(dwFlags & XSESSION_CREATE_USES_PRESENCE) && (dwFlags & XSESSION_CREATE_USES_MATCHMAKING) && (dwFlags & XSESSION_CREATE_MODIFIERS_MASK) != (dwFlags & XSESSION_CREATE_JOIN_IN_PROGRESS_DISABLED)) {
-			return ERROR_INVALID_PARAMETER;
-		}
-		if ((dwFlags & XSESSION_CREATE_JOIN_VIA_PRESENCE_DISABLED) && (dwFlags & XSESSION_CREATE_JOIN_VIA_PRESENCE_FRIENDS_ONLY)) {
-			return ERROR_INVALID_PARAMETER;
-		}
+
+	DWORD *v9 = pcbResults;
+	DWORD v10 = *pcbResults;
+	DWORD v11 = dwNumStatsSpecs * (52 * dwNumXuids + 16) + 8;
+	if (dwNumStatsSpecs)
+	{
+		DWORD *v12 = (DWORD*)((char*)pSpecs + 4);
+		do
+		{
+			v11 += 28 * dwNumXuids * *v12;
+			v12 += 34;
+			--dwNumStatsSpecs;
+		} while (dwNumStatsSpecs);
+		v9 = pcbResults;
+	}
+	if (v11 > v10)
+	{
+		*v9 = v11;
+		return ERROR_INSUFFICIENT_BUFFER;
 	}
 
-	*phEnum = CreateMutex(NULL, NULL, NULL);
-
-	// local cache
-	xlive_session_details.dwUserIndexHost = dwUserIndex;//XUSER_INDEX_NONE ?
-
-	// already filled - SetContext
-	//xlive_session_details.dwGameType = 0;
-	//xlive_session_details.dwGameMode = 0;
-
-	xlive_session_details.dwFlags = dwFlags;
-
-	xlive_session_details.dwMaxPublicSlots = dwMaxPublicSlots;
-	xlive_session_details.dwMaxPrivateSlots = dwMaxPrivateSlots;
-	xlive_session_details.dwAvailablePublicSlots = dwMaxPublicSlots;
-	xlive_session_details.dwAvailablePrivateSlots = dwMaxPrivateSlots;
-
-	xlive_session_details.dwActualMemberCount = 0;
-	xlive_session_details.dwReturnedMemberCount = 0;
-
-	xlive_session_details.eState = XSESSION_STATE_LOBBY;
-	xlive_session_details.qwNonce = *pqwSessionNonce;
-
-	//xlive_session_details.sessionInfo = *pSessionInfo; //check this.
-
-	
-	//TODO XSessionCreate
+	//TODO XUserReadStats
 	if (pXOverlapped) {
 		//asynchronous
 
@@ -1216,6 +1230,90 @@ DWORD WINAPI XSessionCreate(DWORD dwFlags, DWORD dwUserIndex, DWORD dwMaxPublicS
 		//return result;
 	}
 	return ERROR_SUCCESS;
+}
+
+// #5284
+DWORD WINAPI XUserCreateStatsEnumeratorByRank(DWORD dwTitleId, DWORD dwRankStart, DWORD dwNumRows, DWORD dwNumStatsSpecs, const XUSER_STATS_SPEC *pSpecs, DWORD *pcbBuffer, PHANDLE ph)
+{
+	TRACE_FX();
+	if (!dwRankStart)
+		return ERROR_INVALID_PARAMETER;
+	if (!dwNumRows || dwNumRows > 0x64)
+		return ERROR_INVALID_PARAMETER;
+	if (!dwNumStatsSpecs || dwNumStatsSpecs > 0x40)
+		return ERROR_INVALID_PARAMETER;
+	if (!pSpecs)
+		return ERROR_INVALID_PARAMETER;
+	if (!pcbBuffer)
+		return ERROR_INVALID_PARAMETER;
+	if (!ph)
+		return ERROR_INVALID_PARAMETER;
+
+	DWORD v9 = dwNumStatsSpecs;
+	DWORD v12 = v9 * (48 * dwNumRows + 16) + 8;
+	if (v9)
+	{
+		DWORD *v13 = (DWORD*)((char *)pSpecs + 4);
+		do
+		{
+			v12 += 28 * dwNumRows * *v13;
+			v13 += 34;
+			--v9;
+		} while (v9);
+	}
+	*pcbBuffer = v12;
+	*ph = CreateMutex(NULL, NULL, NULL);
+
+	return ERROR_SUCCESS;
+}
+
+// #5286
+DWORD WINAPI XUserCreateStatsEnumeratorByXuid(DWORD dwTitleId, XUID XuidPivot, DWORD dwNumRows, DWORD dwNumStatsSpecs, const XUSER_STATS_SPEC *pSpecs, DWORD *pcbBuffer, HANDLE *ph)
+{
+	TRACE_FX();
+	if (!XuidPivot)
+		return ERROR_INVALID_PARAMETER;
+	if (!dwNumRows || dwNumRows > 0x64)
+		return ERROR_INVALID_PARAMETER;
+	if (!dwNumStatsSpecs || dwNumStatsSpecs > 0x40)
+		return ERROR_INVALID_PARAMETER;
+	if (!pSpecs)
+		return ERROR_INVALID_PARAMETER;
+	if (!pcbBuffer)
+		return ERROR_INVALID_PARAMETER;
+	if (!ph)
+		return ERROR_INVALID_PARAMETER;
+
+	DWORD v9 = dwNumStatsSpecs;
+	DWORD v12 = v9 * (48 * dwNumRows + 16) + 8;
+	if (v9)
+	{
+		DWORD *v13 = (DWORD*)((char *)pSpecs + 4);
+		do
+		{
+			v12 += 28 * dwNumRows * *v13;
+			v13 += 34;
+			--v9;
+		} while (v9);
+	}
+	*pcbBuffer = v12;
+	*ph = CreateMutex(NULL, NULL, NULL);
+
+	return ERROR_SUCCESS;
+}
+
+// #5292
+VOID XUserSetContextEx()
+{
+	TRACE_FX();
+	__debugbreak();
+}
+
+// #5293
+VOID XUserSetPropertyEx()
+{
+	TRACE_FX();
+	__debugbreak();
 }
 
 // #5303
@@ -1330,7 +1428,28 @@ DWORD WINAPI XOnlineStartup()
 	TRACE_FX();
 	if (!xlive_net_initialized)
 		return ERROR_FUNCTION_FAILED;
-	return ERROR_SUCCESS;
+
+	WSADATA wsaData;
+	DWORD result = XWSAStartup(2, &wsaData);
+	xlive_online_initialized = result == 0;
+	return result;
+}
+
+// #5311
+DWORD WINAPI XOnlineCleanup()
+{
+	TRACE_FX();
+	if (xlive_online_initialized) {
+		return XWSACleanup();
+	}
+	return WSANOTINITIALISED;
+}
+
+// #5324
+VOID XOnlineGetNatType()
+{
+	TRACE_FX();
+	__debugbreak();
 }
 
 // #5312
@@ -1373,7 +1492,7 @@ DWORD WINAPI XInviteGetAcceptedInfo(DWORD dwUserIndex, XINVITE_INFO *pInfo)
 	if (xlive_invite_to_game) {
 		xlive_invite_to_game = false;
 		unsigned long resolvedAddr;
-		if ((resolvedAddr = inet_addr("10.0.0.20")) == INADDR_NONE) {
+		if ((resolvedAddr = inet_addr("192.168.0.22")) == INADDR_NONE) {
 			return ERROR;
 		}
 
@@ -1406,6 +1525,41 @@ DWORD WINAPI XInviteGetAcceptedInfo(DWORD dwUserIndex, XINVITE_INFO *pInfo)
 	return ERROR_FUNCTION_FAILED;
 }
 
+// #5316
+DWORD XInviteSend(DWORD dwUserIndex, DWORD cInvitees, const XUID *pXuidInvitees, const WCHAR *pszText, XOVERLAPPED *pXOverlapped)
+{
+	TRACE_FX();
+	if (dwUserIndex >= XLIVE_LOCAL_USER_COUNT)
+		return ERROR_NO_SUCH_USER;
+	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
+		return ERROR_NOT_LOGGED_ON;
+	if (!cInvitees || cInvitees > 0x64)
+		return E_INVALIDARG;
+	if (!pXuidInvitees)
+		return E_POINTER;
+	if (pszText && wcsnlen_s(pszText, 0x100+1) > 0x100)
+		return E_INVALIDARG;
+
+
+	//TODO XInviteSend
+	if (pXOverlapped) {
+		//asynchronous
+
+		pXOverlapped->InternalLow = ERROR_SUCCESS;
+		pXOverlapped->InternalHigh = ERROR_SUCCESS;
+		pXOverlapped->dwExtendedError = ERROR_SUCCESS;
+
+		Check_Overlapped(pXOverlapped);
+
+		return ERROR_IO_PENDING;
+	}
+	else {
+		//synchronous
+		//return result;
+	}
+	return ERROR_SUCCESS;
+}
+
 // #5331
 DWORD WINAPI XUserReadProfileSettings(
 	DWORD dwTitleId,
@@ -1421,14 +1575,18 @@ DWORD WINAPI XUserReadProfileSettings(
 		return ERROR_NO_SUCH_USER;
 	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
 		return ERROR_NOT_LOGGED_ON;
-	if (!dwNumSettingIds)
+	if (!dwNumSettingIds || dwNumSettingIds > 0x20)
 		return ERROR_INVALID_PARAMETER;
 	if (!pdwSettingIds)
 		return ERROR_INVALID_PARAMETER;
 	if (!pcbResults)
 		return ERROR_INVALID_PARAMETER;
+	if (*pcbResults && !pResults)
+		return ERROR_INVALID_PARAMETER;
 	if (!pResults)
 		return ERROR_INVALID_PARAMETER;
+
+	return ERROR_FUNCTION_FAILED;
 
 	//TODO check this
 	if (*pcbResults < 1036) {
@@ -1456,6 +1614,13 @@ DWORD WINAPI XUserReadProfileSettings(
 		//return result;
 	}
 	return ERROR_SUCCESS;
+}
+
+// #5337
+VOID XUserWriteProfileSettings()
+{
+	TRACE_FX();
+	__debugbreak();
 }
 
 // #5344
