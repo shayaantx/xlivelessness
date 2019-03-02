@@ -57,6 +57,9 @@
     <ClCompile Include="xlln\RandName.cpp">
       <Filter>Source Files\xlln</Filter>
     </ClCompile>
+    <ClCompile Include="xlive\xshow.cpp">
+      <Filter>Source Files\xlive</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="xlln\DebugText.h">
@@ -94,6 +97,9 @@
     </ClInclude>
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="xlive\xshow.h">
+      <Filter>Source Files\xlive</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

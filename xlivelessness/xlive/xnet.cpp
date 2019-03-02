@@ -1,5 +1,7 @@
+#include <winsock2.h>
 #include "xdefs.h"
 #include "xnet.h"
+#include "xlive.h"
 #include "../xlln/DebugText.h"
 #include "xsocket.h"
 
@@ -48,10 +50,8 @@ void UnregisterSecureAddr(const IN_ADDR ina)
 INT WINAPI XNetStartup(const XNetStartupParams *pxnsp)
 {
 	TRACE_FX();
-	if (pxnsp) {
-		if (pxnsp->cfgSizeOfStruct != sizeof(XNetStartupParams))
-			return ERROR_INVALID_PARAMETER;
-	}
+	if (pxnsp && pxnsp->cfgSizeOfStruct != sizeof(XNetStartupParams))
+		return ERROR_INVALID_PARAMETER;
 	if (!xlive_netsocket_abort)
 		xlive_net_initialized = TRUE;
 	if (!xlive_net_initialized)
@@ -64,7 +64,7 @@ INT WINAPI XNetCleanup()
 {
 	TRACE_FX();
 	xlive_net_initialized = FALSE;
-	if (Result_WSAStartup != 0)
+	if (!xlive_online_initialized)
 		return WSANOTINITIALISED;
 	return ERROR_SUCCESS;
 }
@@ -73,9 +73,11 @@ INT WINAPI XNetCleanup()
 INT WINAPI XNetRandom(BYTE *pb, UINT cb)
 {
 	TRACE_FX();
-	if (cb)
-		for (DWORD i = 0; i < cb; i++)
+	if (cb) {
+		for (DWORD i = 0; i < cb; i++) {
 			pb[i] = static_cast<BYTE>(rand());
+		}
+	}
 
 	return S_OK;
 }
@@ -176,6 +178,38 @@ INT WINAPI XNetGetConnectStatus(const IN_ADDR ina)
 	if (!xlive_net_initialized)
 		return XNET_CONNECT_STATUS_PENDING;
 	return XNET_CONNECT_STATUS_CONNECTED;
+}
+
+// #67
+INT WINAPI XNetDnsLookup(const char *pszHost, WSAEVENT hEvent, XNDNS **ppxndns)
+{
+	TRACE_FX();
+	if (!ppxndns) {
+		return ERROR_INVALID_PARAMETER;
+	}
+	
+	// Improper Implementation.
+	struct hostent *he = gethostbyname(pszHost);
+	INT result = WSAGetLastError();
+
+	if (he != NULL) {
+		struct in_addr **addr_list = (struct in_addr **)he->h_addr_list;
+		int i = 0;
+		for (; addr_list[i] != NULL && i < 8; i++) {
+			memcpy_s((&(*ppxndns)->aina)[i], sizeof(in_addr), addr_list[i], sizeof(in_addr));
+		}
+		(*ppxndns)->cina = i;
+	}
+
+	return result;
+}
+
+// #68
+INT WINAPI XNetDnsRelease(XNDNS *pxndns)
+{
+	TRACE_FX();
+	INT result = ERROR_SUCCESS;
+	return result;
 }
 
 // #73

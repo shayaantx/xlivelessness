@@ -9,7 +9,6 @@
 
 #define IPPROTO_VDP 254
 
-INT Result_WSAStartup = WSANOTINITIALISED;
 WORD xlive_base_port = 1000;
 BOOL xlive_netsocket_abort = FALSE;
 static SOCKET xlive_VDP_socket = NULL;
@@ -26,8 +25,8 @@ VOID CustomMemCpy(void *dst, void *src, rsize_t len)
 INT WINAPI XWSAStartup(WORD wVersionRequested, LPWSADATA lpWSAData)
 {
 	TRACE_FX();
-	Result_WSAStartup = WSAStartup(wVersionRequested, lpWSAData);
-	return Result_WSAStartup;
+	INT result = WSAStartup(wVersionRequested, lpWSAData);
+	return result;
 }
 
 // #2
@@ -112,6 +111,22 @@ INT WINAPI XSocketGetSockOpt(SOCKET s, int level, int optname, char *optval, int
 {
 	TRACE_FX();
 	INT result = getsockopt(s, level, optname, optval, optlen);
+	return result;
+}
+
+// #9
+INT WINAPI XSocketGetSockName(SOCKET s, struct sockaddr *name, int *namelen)
+{
+	TRACE_FX();
+	INT result = getsockname(s, name, namelen);
+	return result;
+}
+
+// #10
+INT WINAPI XSocketGetPeerName(SOCKET s, struct sockaddr *name, int *namelen)
+{
+	TRACE_FX();
+	INT result = getpeername(s, name, namelen);
 	return result;
 }
 

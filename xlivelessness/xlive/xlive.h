@@ -19,3 +19,4 @@ struct EligibleAdapter {
 };
 
 extern EligibleAdapter xlive_network_adapter;
+extern BOOL xlive_online_initialized;

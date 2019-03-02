@@ -18,8 +18,8 @@ HWND xlln_window_hwnd = NULL;
 static HMENU xlln_window_hMenu = NULL;
 static int xlln_instance = 0;
 
-static INT xlln_login_player = 0;
-static INT xlln_login_player_h[] = { MYMENU_LOGIN1, MYMENU_LOGIN2, MYMENU_LOGIN3, MYMENU_LOGIN4 };
+static DWORD xlln_login_player = 0;
+static DWORD xlln_login_player_h[] = { MYMENU_LOGIN1, MYMENU_LOGIN2, MYMENU_LOGIN3, MYMENU_LOGIN4 };
 
 BOOL xlln_debug = FALSE;
 
@@ -47,9 +47,10 @@ static HMENU CreateDLLWindowMenu(HINSTANCE hModule)
 	AppendMenu(hMenuPopup, MF_STRING, MYMENU_ABOUT, TEXT("About"));
 	AppendMenu(hMenu, MF_POPUP, (UINT_PTR)hMenuPopup, TEXT("Help"));
 
-	EnableMenuItem(hMenu, MYMENU_LOGIN2, MF_GRAYED);
-	EnableMenuItem(hMenu, MYMENU_LOGIN3, MF_GRAYED);
-	EnableMenuItem(hMenu, MYMENU_LOGIN4, MF_GRAYED);
+	CheckMenuItem(hMenu, xlln_login_player_h[0], MF_CHECKED);
+	//EnableMenuItem(hMenu, MYMENU_LOGIN2, MF_GRAYED);
+	//EnableMenuItem(hMenu, MYMENU_LOGIN3, MF_GRAYED);
+	//EnableMenuItem(hMenu, MYMENU_LOGIN4, MF_GRAYED);
 
 
 	return hMenu;
@@ -136,7 +137,7 @@ DWORD WINAPI XLLNLogin(DWORD dwUserIndex, BOOL bLiveEnabled, DWORD dwUserId, con
 	CheckDlgButton(xlln_window_hwnd, MYWINDOW_CHK_LIVEENABLE, bLiveEnabled ? BST_CHECKED : BST_UNCHECKED);
 
 	BOOL checked = TRUE;//GetMenuState(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], 0) != MF_CHECKED;
-	CheckMenuItem(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], checked ? MF_CHECKED : MF_UNCHECKED);
+	//CheckMenuItem(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], checked ? MF_CHECKED : MF_UNCHECKED);
 
 	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGIN), checked ? SW_HIDE : SW_SHOWNORMAL);
 	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGOUT), checked ? SW_SHOWNORMAL : SW_HIDE);
@@ -157,12 +158,69 @@ DWORD WINAPI XLLNLogout(DWORD dwUserIndex)
 	xlive_users_info_changed[dwUserIndex] = TRUE;
 
 	BOOL checked = FALSE;//GetMenuState(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], 0) != MF_CHECKED;
-	CheckMenuItem(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], checked ? MF_CHECKED : MF_UNCHECKED);
+	//CheckMenuItem(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], checked ? MF_CHECKED : MF_UNCHECKED);
 
 	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGIN), checked ? SW_HIDE : SW_SHOWNORMAL);
 	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGOUT), checked ? SW_SHOWNORMAL : SW_HIDE);
 
 	return ERROR_SUCCESS;
+}
+
+// #41142
+DWORD WINAPI XLLNModifyProperty(DWORD propertyId, DWORD *newValue, DWORD *oldValue)
+{
+	TRACE_FX();
+	if (!propertyId)
+		return ERROR_INVALID_PARAMETER;
+	if (!newValue && !oldValue)
+		return ERROR_INVALID_PARAMETER;
+
+	if (propertyId == 1) {
+		if (oldValue) {
+			*oldValue = xlive_fps_limit;
+		}
+		if (newValue) {
+			SetFPSLimit(*newValue);
+		}
+	}
+	else {
+		return ERROR_UNKNOWN_PROPERTY;
+	}
+
+	return ERROR_SUCCESS;
+}
+
+// #41143
+DWORD WINAPI XLLNDebugLog(DWORD logLevel, const char *message)
+{
+	addDebugText(message);
+	return ERROR_SUCCESS;
+}
+
+static void UpdateUserInputBoxes(DWORD dwUserIndex)
+{
+	for (DWORD i = 0; i < 4; i++) {
+		if (i == dwUserIndex) {
+			continue;
+		}
+		BOOL checked = FALSE;//GetMenuState(xlln_window_hMenu, xlln_login_player_h[xlln_login_player], 0) != MF_CHECKED;
+		CheckMenuItem(xlln_window_hMenu, xlln_login_player_h[i], checked ? MF_CHECKED : MF_UNCHECKED);
+	}
+	BOOL checked = TRUE;
+	CheckMenuItem(xlln_window_hMenu, xlln_login_player_h[dwUserIndex], checked ? MF_CHECKED : MF_UNCHECKED);
+
+	checked = FALSE;
+	if (xlive_users_info[dwUserIndex]->UserSigninState != eXUserSigninState_NotSignedIn)
+		checked = TRUE;
+	BOOL bLiveEnabled = FALSE;
+	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_SignedInToLive)
+		bLiveEnabled = TRUE;
+
+	SetDlgItemText(xlln_window_hwnd, MYWINDOW_TBX_USERNAME, xlive_users_info[dwUserIndex]->szUserName);
+	CheckDlgButton(xlln_window_hwnd, MYWINDOW_CHK_LIVEENABLE, bLiveEnabled ? BST_CHECKED : BST_UNCHECKED);
+
+	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGIN), checked ? SW_HIDE : SW_SHOWNORMAL);
+	ShowWindow(GetDlgItem(xlln_window_hwnd, MYWINDOW_BTN_LOGOUT), checked ? SW_SHOWNORMAL : SW_HIDE);
 }
 
 static LRESULT CALLBACK DLLWindowProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -212,15 +270,19 @@ Executable Launch Parameters:\n\
 		}
 		else if (wParam == MYMENU_LOGIN1) {
 			xlln_login_player = 0;
+			UpdateUserInputBoxes(xlln_login_player);
 		}
 		else if (wParam == MYMENU_LOGIN2) {
 			xlln_login_player = 1;
+			UpdateUserInputBoxes(xlln_login_player);
 		}
 		else if (wParam == MYMENU_LOGIN3) {
 			xlln_login_player = 2;
+			UpdateUserInputBoxes(xlln_login_player);
 		}
 		else if (wParam == MYMENU_LOGIN4) {
 			xlln_login_player = 3;
+			UpdateUserInputBoxes(xlln_login_player);
 		}
 		else if (wParam == MYWINDOW_CHK_LIVEENABLE) {
 			BOOL checked = IsDlgButtonChecked(xlln_window_hwnd, MYWINDOW_CHK_LIVEENABLE) != BST_CHECKED;
@@ -236,6 +298,11 @@ Executable Launch Parameters:\n\
 		}
 		else if (wParam == MYWINDOW_BTN_LOGOUT) {
 			DWORD result_logout = XLLNLogout(xlln_login_player);
+		}
+		else if (wParam == MYWINDOW_BTN_TEST) {
+			// WIP.
+			extern bool xlive_invite_to_game;
+			xlive_invite_to_game = true;
 		}
 		return 0;
 	}
@@ -263,6 +330,11 @@ Executable Launch Parameters:\n\
 
 		hWndControl = CreateWindowA("edit", "", WS_CHILD | (xlln_debug ? WS_VISIBLE : 0) | WS_BORDER | ES_MULTILINE | WS_SIZEBOX | WS_TABSTOP | WS_HSCROLL,
 			10, 120, 350, 500, hwnd, (HMENU)MYWINDOW_TBX_TEST, xlln_hModule, NULL);
+
+		if (xlln_debug) {
+			CreateWindowA("button", "Test", WS_CHILD | WS_VISIBLE | WS_TABSTOP,
+				85, 70, 75, 25, hwnd, (HMENU)MYWINDOW_BTN_TEST, xlln_hModule, NULL);
+		}
 
 	}
 	else if (message == WM_DESTROY) {
@@ -305,7 +377,7 @@ INT InitXLLN(HMODULE hModule)
 			if (wcsstr(lpwszArglist[i], L"-xlivefps=") != NULL) {
 				DWORD tempuint = 0;
 				if (swscanf_s(lpwszArglist[i], L"-xlivefps=%u", &tempuint) == 1) {
-					xlive_fps_limit = tempuint;
+					SetFPSLimit(tempuint);
 				}
 			}
 			else if (wcscmp(lpwszArglist[i], L"-xllndebug") == 0) {
@@ -324,23 +396,26 @@ INT InitXLLN(HMODULE hModule)
 	}
 	LocalFree(lpwszArglist);
 
-	while (xlln_debug_pause && !IsDebuggerPresent())
+	while (xlln_debug_pause && !IsDebuggerPresent()) {
 		Sleep(500L);
+	}
 
 	wchar_t mutex_name[40];
 	DWORD mutex_last_error;
 	HANDLE mutex = NULL;
 	do {
-		if (mutex)
+		if (mutex) {
 			mutex_last_error = CloseHandle(mutex);
+		}
 		xlln_instance++;
 		swprintf(mutex_name, 40, L"Global\\XLLNInstance#%d", xlln_instance);
 		mutex = CreateMutexW(0, FALSE, mutex_name);
 		mutex_last_error = GetLastError();
 	} while (mutex_last_error != ERROR_SUCCESS);
 
-	if (xlln_debug)
+	if (xlln_debug) {
 		initDebugText(xlln_instance);
+	}
 
 	xlln_hModule = hModule;
 	CreateThread(0, NULL, ThreadProc, (LPVOID)hModule, NULL, NULL);

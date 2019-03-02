@@ -12,8 +12,8 @@
 
 static BOOL xlive_xlocator_initialized = FALSE;
 
-#pragma pack(push) // save current alignment setting
-#pragma pack(1)   // specify single-byte alignment
+#pragma pack(push) // Save current alignment setting.
+#pragma pack(1) // Specify single-byte alignment.
 typedef struct {
 	DWORD padding1;
 	XUID xuid;
@@ -27,7 +27,7 @@ typedef struct {
 	DWORD cProperties;
 	DWORD pProperties;
 } LIVE_SERVER_DETAILS;
-#pragma pack(pop) // return to original alignment setting
+#pragma pack(pop) // Return to original alignment setting.
 
 CRITICAL_SECTION xlive_xlocator_enumerators_lock;
 std::map<HANDLE, std::vector<std::pair<DWORD, WORD>>> xlive_xlocator_enumerators;
