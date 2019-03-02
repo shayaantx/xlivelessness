@@ -20,16 +20,6 @@ DWORD XUserCreateStatsEnumeratorByXuid(
 	PHANDLE *ph
 );
 
-DWORD XUserCreateStatsEnumeratorByXuid(
-	DWORD dwTitleId,
-	XUID XuidPivot,
-	DWORD dwNumRows,
-	DWORD dwNumStatsSpecs,
-	CONST XUSER_STATS_SPEC *pSpecs,
-	PDWORD *pcbBuffer,
-	PHANDLE *ph
-);
-
 DWORD XUserAwardGamerPicture(
 	DWORD dwUserIndex,
 	DWORD dwPictureId,

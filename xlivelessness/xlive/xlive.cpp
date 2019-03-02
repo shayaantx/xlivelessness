@@ -264,88 +264,6 @@ BOOL XLivepIsPropertyIdValid(DWORD dwPropertyId, BOOL a2)
 		|| !a2 && dwPropertyId == X_PROPERTY_GAMER_HOSTNAME;
 }
 
-int WINAPI XOnlineCleanup()
-{
-	//TODO: what is there to cleanup
-	TRACE_FX();
-	return 0;
-}
-
-HRESULT _stdcall XLiveSetDebugLevel(
-	XLIVE_DEBUG_LEVEL xdlLevel,
-	XLIVE_DEBUG_LEVEL *pxdlOldLevel
-)
-{
-	TRACE_FX();
-	return 0;
-}
-
-DWORD XShowAchievementsUI(DWORD dwUserIndex)
-{
-	TRACE_FX();
-	return 1;
-}
-
-DWORD XShowFriendsUI(DWORD dwUserIndex)
-{
-	TRACE_FX();
-	return 1;
-}
-
-DWORD XShowFriendRequestUI(DWORD dwUserIndex, XUID xuidUser)
-{
-	TRACE_FX();
-	return 1;
-}
-
-DWORD XShowGameInviteUI(DWORD dwUserIndex, const XUID * pXuidRecipients, DWORD cRecipients, LPCWSTR wszUnused)
-{
-	TRACE_FX();
-	return 1;
-}
-
-DWORD XShowMessageComposeUI(DWORD dwUserIndex, const XUID * pXuidRecipients, DWORD cRecipients, LPCWSTR wszText)
-{
-	TRACE_FX();
-	return 1;
-}
-
-DWORD XShowMessagesUI(DWORD dwUserIndex)
-{
-	TRACE_FX();
-	return 1;
-}
-
-DWORD XShowPlayerReviewUI(DWORD dwUserIndex, XUID XuidFeedbackTarget)
-{
-	TRACE_FX();
-	return 1;
-}
-
-DWORD XShowPlayersUI(DWORD dwUserIndex)
-{
-	TRACE_FX();
-	return 1;
-}
-
-DWORD XUserAreUsersFriends(DWORD dwUserIndex, PXUID pXuids, DWORD dwXuidCount, PBOOL pfResult, PXOVERLAPPED pOverlapped)
-{
-	TRACE_FX();
-	return 1;
-}
-
-HRESULT XLiveOnDestroyDevice()
-{
-	TRACE_FX();
-	return S_OK;
-}
-
-DWORD WINAPI XNotifyPositionUI(DWORD dwPosition)
-{
-	TRACE_FX();
-	return S_OK;
-}
-
 // #472
 VOID WINAPI XCustomSetAction(DWORD dwActionIndex, LPCWSTR lpwszActionText, DWORD dwFlags)
 {
@@ -1035,13 +953,6 @@ DWORD WINAPI XUserCheckPrivilege(DWORD dwUserIndex, XPRIVILEGE_TYPE PrivilegeTyp
 	return ERROR_SUCCESS;
 }
 
-// #5267
-VOID XUserGetSigninInfo()
-{
-	TRACE_FX();
-	__debugbreak();
-}
-
 // #5270: Requires XNotifyGetNext to process the listener.
 HANDLE WINAPI XNotifyCreateListener(ULONGLONG qwAreas)
 {
@@ -1057,13 +968,6 @@ HANDLE WINAPI XNotifyCreateListener(ULONGLONG qwAreas)
 
 	SetEvent(g_dwFakeListener);
 	return g_dwFakeListener;
-}
-
-// #5274
-VOID XUserAwardGamerPicture()
-{
-	TRACE_FX();
-	__debugbreak();
 }
 
 // #5276
@@ -1172,148 +1076,6 @@ DWORD WINAPI XUserCreateAchievementEnumerator(DWORD dwTitleId, DWORD dwUserIndex
 	*phEnum = CreateMutex(NULL, NULL, NULL);
 
 	return ERROR_SUCCESS;
-}
-
-// #5281
-DWORD WINAPI XUserReadStats(DWORD dwTitleId, DWORD dwNumXuids, CONST XUID *pXuids, DWORD dwNumStatsSpecs, CONST XUSER_STATS_SPEC *pSpecs, DWORD *pcbResults, XUSER_STATS_READ_RESULTS *pResults, XOVERLAPPED *pXOverlapped)
-{
-	TRACE_FX();
-	if (!dwNumXuids || dwNumXuids > 0x65)
-		return ERROR_INVALID_PARAMETER;
-	if (!pXuids)
-		return ERROR_INVALID_PARAMETER;
-	if (!dwNumStatsSpecs || dwNumStatsSpecs > 0x40)
-		return ERROR_INVALID_PARAMETER;
-	if (!pSpecs)
-		return ERROR_INVALID_PARAMETER;
-	if (!pcbResults)
-		return ERROR_INVALID_PARAMETER;
-	if (*pcbResults && !pResults)
-		return ERROR_INVALID_PARAMETER;
-	if (!*pcbResults && pResults)
-		return ERROR_INVALID_PARAMETER;
-
-	DWORD *v9 = pcbResults;
-	DWORD v10 = *pcbResults;
-	DWORD v11 = dwNumStatsSpecs * (52 * dwNumXuids + 16) + 8;
-	if (dwNumStatsSpecs)
-	{
-		DWORD *v12 = (DWORD*)((char*)pSpecs + 4);
-		do
-		{
-			v11 += 28 * dwNumXuids * *v12;
-			v12 += 34;
-			--dwNumStatsSpecs;
-		} while (dwNumStatsSpecs);
-		v9 = pcbResults;
-	}
-	if (v11 > v10)
-	{
-		*v9 = v11;
-		return ERROR_INSUFFICIENT_BUFFER;
-	}
-
-	//TODO XUserReadStats
-	if (pXOverlapped) {
-		//asynchronous
-
-		pXOverlapped->InternalLow = ERROR_SUCCESS;
-		pXOverlapped->InternalHigh = ERROR_SUCCESS;
-		pXOverlapped->dwExtendedError = ERROR_SUCCESS;
-
-		Check_Overlapped(pXOverlapped);
-
-		return ERROR_IO_PENDING;
-	}
-	else {
-		//synchronous
-		//return result;
-	}
-	return ERROR_SUCCESS;
-}
-
-// #5284
-DWORD WINAPI XUserCreateStatsEnumeratorByRank(DWORD dwTitleId, DWORD dwRankStart, DWORD dwNumRows, DWORD dwNumStatsSpecs, const XUSER_STATS_SPEC *pSpecs, DWORD *pcbBuffer, PHANDLE ph)
-{
-	TRACE_FX();
-	if (!dwRankStart)
-		return ERROR_INVALID_PARAMETER;
-	if (!dwNumRows || dwNumRows > 0x64)
-		return ERROR_INVALID_PARAMETER;
-	if (!dwNumStatsSpecs || dwNumStatsSpecs > 0x40)
-		return ERROR_INVALID_PARAMETER;
-	if (!pSpecs)
-		return ERROR_INVALID_PARAMETER;
-	if (!pcbBuffer)
-		return ERROR_INVALID_PARAMETER;
-	if (!ph)
-		return ERROR_INVALID_PARAMETER;
-
-	DWORD v9 = dwNumStatsSpecs;
-	DWORD v12 = v9 * (48 * dwNumRows + 16) + 8;
-	if (v9)
-	{
-		DWORD *v13 = (DWORD*)((char *)pSpecs + 4);
-		do
-		{
-			v12 += 28 * dwNumRows * *v13;
-			v13 += 34;
-			--v9;
-		} while (v9);
-	}
-	*pcbBuffer = v12;
-	*ph = CreateMutex(NULL, NULL, NULL);
-
-	return ERROR_SUCCESS;
-}
-
-// #5286
-DWORD WINAPI XUserCreateStatsEnumeratorByXuid(DWORD dwTitleId, XUID XuidPivot, DWORD dwNumRows, DWORD dwNumStatsSpecs, const XUSER_STATS_SPEC *pSpecs, DWORD *pcbBuffer, HANDLE *ph)
-{
-	TRACE_FX();
-	if (!XuidPivot)
-		return ERROR_INVALID_PARAMETER;
-	if (!dwNumRows || dwNumRows > 0x64)
-		return ERROR_INVALID_PARAMETER;
-	if (!dwNumStatsSpecs || dwNumStatsSpecs > 0x40)
-		return ERROR_INVALID_PARAMETER;
-	if (!pSpecs)
-		return ERROR_INVALID_PARAMETER;
-	if (!pcbBuffer)
-		return ERROR_INVALID_PARAMETER;
-	if (!ph)
-		return ERROR_INVALID_PARAMETER;
-
-	DWORD v9 = dwNumStatsSpecs;
-	DWORD v12 = v9 * (48 * dwNumRows + 16) + 8;
-	if (v9)
-	{
-		DWORD *v13 = (DWORD*)((char *)pSpecs + 4);
-		do
-		{
-			v12 += 28 * dwNumRows * *v13;
-			v13 += 34;
-			--v9;
-		} while (v9);
-	}
-	*pcbBuffer = v12;
-	*ph = CreateMutex(NULL, NULL, NULL);
-
-	return ERROR_SUCCESS;
-}
-
-// #5292
-VOID XUserSetContextEx()
-{
-	TRACE_FX();
-	__debugbreak();
-}
-
-// #5293
-VOID XUserSetPropertyEx()
-{
-	TRACE_FX();
-	__debugbreak();
 }
 
 // #5303
@@ -1614,13 +1376,6 @@ DWORD WINAPI XUserReadProfileSettings(
 		//return result;
 	}
 	return ERROR_SUCCESS;
-}
-
-// #5337
-VOID XUserWriteProfileSettings()
-{
-	TRACE_FX();
-	__debugbreak();
 }
 
 // #5344

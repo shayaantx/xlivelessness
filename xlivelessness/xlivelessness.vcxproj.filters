@@ -60,9 +60,6 @@
     <ClCompile Include="xlive\xuser.cpp">
       <Filter>Source Files\xlive</Filter>
     </ClCompile>
-    <ClCompile Include="xlive\xonline.cpp">
-      <Filter>Source Files\xlive</Filter>
-    </ClCompile>
     <ClCompile Include="xlive\dnshelper.cpp">
       <Filter>Source Files\xlive</Filter>
     </ClCompile>
@@ -108,9 +105,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="xlive\xuser.h">
-      <Filter>Source Files\xlive</Filter>
-    </ClInclude>
-    <ClInclude Include="xlive\xonline.h">
       <Filter>Source Files\xlive</Filter>
     </ClInclude>
     <ClInclude Include="xlive\dnshelper.h">

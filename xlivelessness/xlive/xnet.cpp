@@ -48,16 +48,6 @@ void UnregisterSecureAddr(const IN_ADDR ina)
 	}
 }
 
-int WINAPI XSocketGetSockName(SOCKET s, struct sockaddr *name, int *namelen)
-{
-	return getsockname(s, name, namelen);
-}
-
-int WINAPI XSocketGetPeerName(SOCKET s, struct sockaddr *name, int *namelen)
-{
-	return getpeername(s, name, namelen);
-}
-
 int WINAPI XNetDnsLookup(const char *hostname, WSAEVENT onDnsLookupCompletedEvent, XNDNS** ppxndns)
 {
 	return dnsHelper.lookup(hostname, onDnsLookupCompletedEvent, ppxndns);
@@ -202,38 +192,6 @@ INT WINAPI XNetGetConnectStatus(const IN_ADDR ina)
 	return XNET_CONNECT_STATUS_CONNECTED;
 }
 
-// #67
-INT WINAPI XNetDnsLookup(const char *pszHost, WSAEVENT hEvent, XNDNS **ppxndns)
-{
-	TRACE_FX();
-	if (!ppxndns) {
-		return ERROR_INVALID_PARAMETER;
-	}
-	
-	// Improper Implementation.
-	struct hostent *he = gethostbyname(pszHost);
-	INT result = WSAGetLastError();
-
-	if (he != NULL) {
-		struct in_addr **addr_list = (struct in_addr **)he->h_addr_list;
-		int i = 0;
-		for (; addr_list[i] != NULL && i < 8; i++) {
-			memcpy_s((&(*ppxndns)->aina)[i], sizeof(in_addr), addr_list[i], sizeof(in_addr));
-		}
-		(*ppxndns)->cina = i;
-	}
-
-	return result;
-}
-
-// #68
-INT WINAPI XNetDnsRelease(XNDNS *pxndns)
-{
-	TRACE_FX();
-	INT result = ERROR_SUCCESS;
-	return result;
-}
-
 // #73
 DWORD WINAPI XNetGetTitleXnAddr(XNADDR *pAddr)
 {
@@ -263,10 +221,4 @@ INT WINAPI XNetSetSystemLinkPort(WORD wSystemLinkPort)
 	WORD hPort = ntohs(wSystemLinkPort);
 
 	return ERROR_SUCCESS;
-}
-
-XONLINE_NAT_TYPE WINAPI XOnlineGetNatType()
-{
-	TRACE_FX();
-	return XONLINE_NAT_OPEN;
 }

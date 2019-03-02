@@ -134,7 +134,6 @@
     <ClCompile Include="xlive\xlocator.cpp" />
     <ClCompile Include="xlive\xnet.cpp" />
     <ClCompile Include="xlive\xnetqos.cpp" />
-    <ClCompile Include="xlive\xonline.cpp" />
     <ClCompile Include="xlive\xrender.cpp" />
     <ClCompile Include="xlive\xsession.cpp" />
     <ClCompile Include="xlive\xshow.cpp" />
@@ -155,7 +154,6 @@
     <ClInclude Include="xlive\xlive.h" />
     <ClInclude Include="xlive\xlocator.h" />
     <ClInclude Include="xlive\xnet.h" />
-    <ClInclude Include="xlive\xonline.h" />
     <ClInclude Include="xlive\xrender.h" />
     <ClInclude Include="xlive\xsession.h" />
     <ClInclude Include="xlive\xshow.h" />
