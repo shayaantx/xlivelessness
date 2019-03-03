@@ -1322,6 +1322,9 @@ DWORD XInviteSend(DWORD dwUserIndex, DWORD cInvitees, const XUID *pXuidInvitees,
 	return ERROR_SUCCESS;
 }
 
+
+CHAR strw_XUser[8192];
+
 // #5331
 DWORD WINAPI XUserReadProfileSettings(
 	DWORD dwTitleId,
@@ -1345,19 +1348,154 @@ DWORD WINAPI XUserReadProfileSettings(
 		return ERROR_INVALID_PARAMETER;
 	if (*pcbResults && !pResults)
 		return ERROR_INVALID_PARAMETER;
-	if (!pResults)
-		return ERROR_INVALID_PARAMETER;
-
-	return ERROR_FUNCTION_FAILED;
-
-	//TODO check this
-	if (*pcbResults < 1036) {
-		*pcbResults = 1036;	// TODO: make correct calculation by IDs.
-		return ERROR_INSUFFICIENT_BUFFER;
+	if (!pResults) {
+		//pResults can be null
+		addDebugText("No read profile settings results pointer found");
 	}
-	memset(pResults, 0, *pcbResults);
-	pResults->dwSettingsLen = *pcbResults - sizeof(XUSER_PROFILE_SETTING);
-	pResults->pSettings = (XUSER_PROFILE_SETTING *)pResults + sizeof(XUSER_PROFILE_SETTING);
+
+	if (*pcbResults == 0)
+	{
+		int size;
+
+
+		size = 0;
+		for (DWORD lcv = 0; lcv < dwNumSettingIds; lcv++)
+		{
+			int settingType, settingSize, settingId;
+
+			settingType = (pdwSettingIds[lcv] >> 28) & 0x0F;
+			settingSize = (pdwSettingIds[lcv] >> 16) & 0xFFF;
+			settingId = (pdwSettingIds[lcv] >> 0) & 0x3FFF;
+
+
+			wsprintf(strw_XUser, "- Settings %d: %X  (Type = %X, Size = %d", lcv + 1,
+				pdwSettingIds[lcv], settingType, settingSize);
+
+
+			switch (settingId)
+			{
+			case 3: wsprintf(strw_XUser, "%s, id = XPROFILE_OPTION_CONTROLLER_VIBRATION)", strw_XUser); break;
+			case 1: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_NXE)", strw_XUser); break;
+			case 2: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_YAXIS_INVERSION)", strw_XUser); break;
+			case 24: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_CONTROL_SENSITIVITY)", strw_XUser); break;
+
+			case 4: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_ZONE)", strw_XUser); break;
+			case 5: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_REGION)", strw_XUser); break;
+			case 6: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_CRED)", strw_XUser); break;
+			case 11: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_REP)", strw_XUser); break;
+			case 71: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_YEARS)", strw_XUser); break;
+			case 72: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_BOUBLES)", strw_XUser); break;
+			case 15: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_PICTURE_KEY)", strw_XUser); break;
+			case 64: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_NAME)", strw_XUser); break;
+			case 65: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_LOCATION)", strw_XUser); break;
+			case 17: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_MOTTO)", strw_XUser); break;
+			case 18: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_TITLES_PLAYED)", strw_XUser); break;
+			case 19: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_ACHIEVEMENTS_EARNED)", strw_XUser); break;
+
+			case 21: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_DIFFICULTY)", strw_XUser); break;
+
+			case 29: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_PREFERRED_COLOR_FIRST)", strw_XUser); break;
+			case 30: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_PREFERRED_COLOR_SECOND)", strw_XUser); break;
+
+			case 34: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_ACTION_AUTO_AIM)", strw_XUser); break;
+			case 35: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_ACTION_AUTO_CENTER)", strw_XUser); break;
+			case 36: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_ACTION_MOVEMENT_CONTROL)", strw_XUser); break;
+
+			case 38: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_RACE_TRANSMISSION)", strw_XUser); break;
+			case 39: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_RACE_CAMERA_LOCATION)", strw_XUser); break;
+			case 40: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_RACE_BRAKE_CONTROL)", strw_XUser); break;
+			case 41: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMER_RACE_ACCELERATOR_CONTROL)", strw_XUser); break;
+
+			case 56: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_TITLE_CRED_EARNED)", strw_XUser); break;
+			case 57: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_TITLE_ACHIEVEMENTS_EARNED)", strw_XUser); break;
+			case 67: wsprintf(strw_XUser, "%s, id = XPROFILE_GAMERCARD_BIO)", strw_XUser); break;
+			case 68: wsprintf(strw_XUser, "%s, id = XPROFILE_AVATAR_METADATA)", strw_XUser); break;
+
+			case 0x3FFF: wsprintf(strw_XUser, "%s, id = XPROFILE_TITLE_SPECIFIC1)", strw_XUser); break;
+			case 0x3FFE: wsprintf(strw_XUser, "%s, id = XPROFILE_TITLE_SPECIFIC2)", strw_XUser); break;
+			case 0x3FFD: wsprintf(strw_XUser, "%s, id = XPROFILE_TITLE_SPECIFIC3)", strw_XUser); break;
+			default: wsprintf(strw_XUser, "%s, id = Unknown)", strw_XUser); break;
+			}
+			size += settingSize;
+		}
+
+		*pcbResults = size;
+		*pcbResults += dwNumSettingIds * sizeof(XUSER_PROFILE_SETTING);
+		*pcbResults += sizeof(XUSER_READ_PROFILE_SETTING_RESULT);
+
+	}
+
+	if (pResults) {
+		//if caller passed a pointer to the read results, then set it
+		//TODO: 
+		memset(pResults, 0, *pcbResults);
+		pResults->dwSettingsLen = *pcbResults - sizeof(XUSER_PROFILE_SETTING);
+		pResults->pSettings = (XUSER_PROFILE_SETTING *)pResults + sizeof(XUSER_PROFILE_SETTING);
+
+		XUSER_PROFILE_SETTING *ptr = pResults->pSettings;
+		BYTE *pSettingData = (BYTE *)ptr + dwNumSettingIds * sizeof(XUSER_PROFILE_SETTING);
+
+
+		// read data values
+		for (DWORD lcv = 0; lcv < dwNumSettingIds; lcv++)
+		{
+			int settingType, settingSize, settingId;
+
+			settingType = (pdwSettingIds[lcv] >> 28) & 0x0F;
+			settingSize = (pdwSettingIds[lcv] >> 16) & 0xFFF;
+			settingId = (pdwSettingIds[lcv] >> 0) & 0x3FFF;
+
+			strcat(strw_XUser, "\\Offline\\");
+			switch (settingId)
+			{
+			case 0x3FFF:
+				strcat(strw_XUser, "Title1.dat");
+				break;
+			case 0x3FFE:
+				strcat(strw_XUser, "Title2.dat");
+				break;
+			case 0x3FFD:
+				strcat(strw_XUser, "Title3.dat");
+				break;
+			default:
+				strcat(strw_XUser, "Settings.txt");
+				break;
+			}
+
+			FILE *fp;
+
+			fp = fopen(strw_XUser, "rb");
+			if (!fp)
+			{
+				ptr->source = XSOURCE_NO_VALUE;
+			
+			}
+			else
+			{
+				if (settingType == 6)
+				{
+					fread(&ptr->data.binary.cbData, 1, 4, fp);
+					fread(pSettingData, 1, ptr->data.binary.cbData, fp);
+
+
+					ptr->data.binary.pbData = pSettingData;
+					ptr->source = XSOURCE_TITLE;
+				}
+
+
+				fclose(fp);
+			}
+
+
+			ptr->data.type = settingType;
+			ptr->dwSettingId = pdwSettingIds[lcv];
+			ptr->user.dwUserIndex = 0;
+
+
+			pSettingData += settingSize;
+			ptr++;
+		}
+	}
 
 	//TODO XUserReadProfileSettings
 	if (pXOverlapped) {

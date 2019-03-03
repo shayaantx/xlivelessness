@@ -67,14 +67,14 @@ DWORD WINAPI XShowGuideUI(DWORD dwUserIndex)
 }
 
 // #5216
-VOID XShowKeyboardUI()
+VOID WINAPI XShowKeyboardUI()
 {
 	TRACE_FX();
 	__debugbreak();
 }
 
 // #5250
-VOID XShowAchievementsUI()
+VOID WINAPI XShowAchievementsUI()
 {
 	TRACE_FX();
 	__debugbreak();

@@ -1,5 +1,7 @@
 #pragma once
 
+extern XSESSION_LOCAL_DETAILS xlive_session_details;
+
 DWORD WINAPI XUserCreateStatsEnumeratorByRank(
 	DWORD dwTitleId, DWORD dwRankStart, DWORD dwNumRows, 
 	DWORD dwNuStatSpec, CONST XUSER_STATS_SPEC* pSpecs, 
@@ -10,7 +12,7 @@ DWORD WINAPI XUserReadStats(
 	DWORD dwNumStatsSpecs, DWORD *pSpecs, DWORD *pcbResults,
 	DWORD *pResults, PXOVERLAPPED pOverlapped);
 
-DWORD XUserCreateStatsEnumeratorByXuid(
+DWORD WINAPI XUserCreateStatsEnumeratorByXuid(
 	DWORD dwTitleId,
 	XUID XuidPivot,
 	DWORD dwNumRows,
@@ -20,34 +22,34 @@ DWORD XUserCreateStatsEnumeratorByXuid(
 	PHANDLE *ph
 );
 
-DWORD XUserAwardGamerPicture(
+DWORD WINAPI XUserAwardGamerPicture(
 	DWORD dwUserIndex,
 	DWORD dwPictureId,
 	DWORD dwReserved,
 	PXOVERLAPPED pXOverlapped
 );
 
-DWORD XUserWriteProfileSettings(
+DWORD WINAPI XUserWriteProfileSettings(
 	DWORD dwUserIndex,
 	DWORD dwNumSettings,
 	const PXUSER_PROFILE_SETTING pSettings,
 	PXOVERLAPPED pXOverlapped
 );
 
-DWORD XUserGetSigninInfo(
+DWORD WINAPI XUserGetSigninInfo(
 	DWORD dwUserIndex,
 	DWORD dwFlags,
 	PXUSER_SIGNIN_INFO pSigninInfo
 );
 
-DWORD XUserSetContextEx(
+DWORD WINAPI XUserSetContextEx(
 	DWORD dwUserIndex,
 	DWORD dwContextId,
 	DWORD dwContextValue,
 	PXOVERLAPPED pOverlapped
 );
 
-DWORD XUserSetPropertyEx(
+DWORD WINAPI XUserSetPropertyEx(
 	DWORD dwUserIndex,
 	DWORD dwPropertyId,
 	DWORD cbValue,

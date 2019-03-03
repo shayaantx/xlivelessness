@@ -40,7 +40,7 @@ DWORD WINAPI XUserCreateStatsEnumeratorByRank(DWORD dwTitleId, DWORD dwRankStart
 }
 
 // #5267
-DWORD XUserGetSigninInfo(
+DWORD WINAPI XUserGetSigninInfo(
 	DWORD dwUserIndex,
 	DWORD dwFlags,
 	PXUSER_SIGNIN_INFO pSigninInfo)
@@ -144,13 +144,13 @@ DWORD WINAPI XUserCreateStatsEnumeratorByXuid(DWORD dwTitleId, XUID XuidPivot, D
 }
 
 // #5274
-VOID XUserAwardGamerPicture()
+VOID WINAPI XUserAwardGamerPicture()
 {
 	TRACE_FX();
 	__debugbreak();
 }
 
-DWORD XUserWriteProfileSettings(
+DWORD WINAPI XUserWriteProfileSettings(
 	DWORD dwUserIndex,
 	DWORD dwNumSettings,
 	const PXUSER_PROFILE_SETTING pSettings,
@@ -162,14 +162,37 @@ DWORD XUserWriteProfileSettings(
 	return 0;
 }
 
-DWORD XUserSetContextEx(DWORD dwUserIndex, DWORD dwContextId, DWORD dwContextValue, PXOVERLAPPED pOverlapped)
+DWORD WINAPI XUserSetContextEx(DWORD dwUserIndex, DWORD dwContextId, DWORD dwContextValue, PXOVERLAPPED pOverlapped)
 {
 	TRACE_FX();
-	__debugbreak();
-	return ERROR_IO_PENDING;
+	if (dwContextId == X_CONTEXT_GAME_TYPE)
+	{
+		xlive_session_details.dwGameType = dwContextValue;
+	}
+	else if (dwContextId == X_CONTEXT_GAME_MODE)
+	{
+		xlive_session_details.dwGameMode = dwContextValue;
+	}
+
+
+
+	if (pOverlapped == 0)
+		return ERROR_SUCCESS;
+
+	else
+	{
+		pOverlapped->InternalHigh = 0;
+		pOverlapped->InternalLow = ERROR_SUCCESS;
+		pOverlapped->dwExtendedError = ERROR_SUCCESS;
+
+
+		Check_Overlapped(pOverlapped);
+
+		return ERROR_IO_PENDING;
+	}
 }
 
-DWORD XUserSetPropertyEx(DWORD dwUserIndex, DWORD dwPropertyId, DWORD cbValue, const VOID * pvValue, PXOVERLAPPED pOverlapped)
+DWORD WINAPI XUserSetPropertyEx(DWORD dwUserIndex, DWORD dwPropertyId, DWORD cbValue, const VOID * pvValue, PXOVERLAPPED pOverlapped)
 {
 	TRACE_FX();
 	__debugbreak();
