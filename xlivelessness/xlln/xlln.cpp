@@ -363,7 +363,7 @@ INT ShowXLLN(DWORD dwShowType)
 		SetWindowPos(xlln_window_hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 		SendMessage(xlln_window_hwnd, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(xlln_window_hwnd, MYWINDOW_TBX_USERNAME), TRUE);
 	}
-	return 0;
+	return ERROR_SUCCESS;
 }
 
 INT InitXLLN(HMODULE hModule)

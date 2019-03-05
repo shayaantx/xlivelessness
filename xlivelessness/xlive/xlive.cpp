@@ -897,14 +897,14 @@ XUSER_SIGNIN_STATE WINAPI XUserGetSigninState(DWORD dwUserIndex)
 DWORD WINAPI XUserGetName(DWORD dwUserIndex, LPSTR szUserName, DWORD cchUserName)
 {
 	TRACE_FX();
-	if (!szUserName)
-		return ERROR_INVALID_PARAMETER;
-	if (!cchUserName)
-		return ERROR_INVALID_PARAMETER;
 	if (dwUserIndex >= XLIVE_LOCAL_USER_COUNT)
 		return ERROR_NO_SUCH_USER;
 	if (xlive_users_info[dwUserIndex]->UserSigninState == eXUserSigninState_NotSignedIn)
 		return ERROR_NOT_LOGGED_ON;
+	if (!szUserName)
+		return ERROR_INVALID_PARAMETER;
+	if (!cchUserName)
+		return ERROR_INVALID_PARAMETER;
 
 	if (cchUserName > XUSER_NAME_SIZE)
 		cchUserName = XUSER_NAME_SIZE;
