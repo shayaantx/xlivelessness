@@ -46,8 +46,18 @@ DWORD WINAPI XUserGetSigninInfo(
 	PXUSER_SIGNIN_INFO pSigninInfo)
 {
 	TRACE_FX();
-	__debugbreak();
-	return 0;
+	if (pSigninInfo) {
+		pSigninInfo->xuid = xlive_users_info[dwUserIndex]->xuid;
+		pSigninInfo->dwInfoFlags = xlive_users_info[dwUserIndex]->dwInfoFlags;
+		pSigninInfo->dwGuestNumber = xlive_users_info[dwUserIndex]->dwGuestNumber;
+		pSigninInfo->dwSponsorUserIndex = xlive_users_info[dwUserIndex]->dwSponsorUserIndex;
+		pSigninInfo->UserSigninState = xlive_users_info[dwUserIndex]->UserSigninState;
+	}
+	else {
+		pSigninInfo->xuid = INVALID_XUID;
+		return ERROR_NO_SUCH_USER;
+	}
+	return ERROR_SUCCESS;
 }
 
 // #5281
