@@ -3,6 +3,10 @@
 #include "xlive.h"
 #include "xuser.h"
 #include "../xlln/DebugText.h"
+#include <stdio.h>
+
+
+extern CHAR temporaryUserSettingsByteBuffer[8192];
 
 // #5284
 DWORD WINAPI XUserCreateStatsEnumeratorByRank(DWORD dwTitleId, DWORD dwRankStart, DWORD dwNumRows, DWORD dwNumStatsSpecs, const XUSER_STATS_SPEC *pSpecs, DWORD *pcbBuffer, PHANDLE ph)
@@ -168,8 +172,49 @@ DWORD WINAPI XUserWriteProfileSettings(
 ) 
 {
 	TRACE_FX();
-	__debugbreak();
-	return 0;
+	for (DWORD lcv = 0; lcv < dwNumSettings; lcv++)
+	{
+		int type, size, id;
+
+		type = (pSettings[lcv].dwSettingId >> 28) & 0x0F;
+		size = (pSettings[lcv].dwSettingId >> 16) & 0xFFF;
+		id = (pSettings[lcv].dwSettingId >> 0) & 0x3FFF;
+
+		strcat(temporaryUserSettingsByteBuffer, "\\Offline\\");
+
+		switch (id)
+		{
+			case 0x3FFF: strcat(temporaryUserSettingsByteBuffer, "Title1.dat"); break;
+			case 0x3FFE: strcat(temporaryUserSettingsByteBuffer, "Title2.dat");	break;
+			case 0x3FFD: strcat(temporaryUserSettingsByteBuffer, "Title3.dat");	break;
+		}
+
+
+		FILE *fp;
+
+		fp = fopen(temporaryUserSettingsByteBuffer, "wb");
+		if (!fp) continue;
+
+
+		if (type == 6)
+		{
+			fwrite(&pSettings[lcv].data.binary.cbData, 1, 4, fp);
+			fwrite(pSettings[lcv].data.binary.pbData, 1, pSettings[lcv].data.binary.cbData, fp);
+		}
+
+		fclose(fp);
+	}
+
+	if (pXOverlapped)
+	{
+		pXOverlapped->InternalLow = ERROR_SUCCESS;
+		pXOverlapped->dwExtendedError = ERROR_SUCCESS;
+		pXOverlapped->InternalLow = 0;
+
+		Check_Overlapped(pXOverlapped);
+		return ERROR_IO_PENDING;
+	}
+	return ERROR_SUCCESS;
 }
 
 DWORD WINAPI XUserSetContextEx(DWORD dwUserIndex, DWORD dwContextId, DWORD dwContextValue, PXOVERLAPPED pOverlapped)
@@ -205,6 +250,17 @@ DWORD WINAPI XUserSetContextEx(DWORD dwUserIndex, DWORD dwContextId, DWORD dwCon
 DWORD WINAPI XUserSetPropertyEx(DWORD dwUserIndex, DWORD dwPropertyId, DWORD cbValue, const VOID * pvValue, PXOVERLAPPED pOverlapped)
 {
 	TRACE_FX();
-	__debugbreak();
-	return ERROR_IO_PENDING;
+	if (pOverlapped == 0) 
+	{
+		return ERROR_SUCCESS;
+	}
+	else
+	{
+		pOverlapped->InternalHigh = 0;
+		pOverlapped->InternalLow = ERROR_SUCCESS;
+		pOverlapped->dwExtendedError = ERROR_SUCCESS;
+
+		Check_Overlapped(pOverlapped);
+		return ERROR_IO_PENDING;
+	}
 }
