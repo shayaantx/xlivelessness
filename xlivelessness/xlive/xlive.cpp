@@ -34,156 +34,165 @@ static CRITICAL_SECTION d_lock;
 static char* xlive_preferred_network_adapter_name = NULL;
 EligibleAdapter xlive_network_adapter;
 
+CRITICAL_SECTION xlive_critsec_custom_local_user_hipv4;
+unsigned long xlive_custom_local_user_hipv4 = INADDR_NONE;
+
 BOOL xlive_online_initialized = FALSE;
-XLIVE_DEBUG_LEVEL xlive_xdlLevel = XLIVE_DEBUG_LEVEL_OFF;
+
+static XLIVE_DEBUG_LEVEL xlive_xdlLevel = XLIVE_DEBUG_LEVEL_OFF;
 
 INT GetNetworkAdapter()
 {
-	// Declare and initialize variables
-	DWORD dwRetVal = 0;
-
-	// Set the flags to pass to GetAdaptersAddresses
-	ULONG flags = GAA_FLAG_INCLUDE_PREFIX;
-
-	// IPv4
-	ULONG family = AF_INET;
-
-	PIP_ADAPTER_ADDRESSES pAddresses = NULL;
-	// Allocate a 15 KB buffer to start with.
-	ULONG outBufLen = 15000;
-	ULONG Iterations = 0;
-
-	PIP_ADAPTER_ADDRESSES pCurrAddresses = NULL;
-	PIP_ADAPTER_UNICAST_ADDRESS pUnicast = NULL;
-
 	INT result = ERROR_UNIDENTIFIED_ERROR;
 
-	do {
-		pAddresses = (IP_ADAPTER_ADDRESSES*)HeapAlloc(GetProcessHeap(), 0, (outBufLen));
-		if (pAddresses == NULL) {
-			addDebugText("Memory allocation failed for IP_ADAPTER_ADDRESSES struct");
-			dwRetVal = ERROR_NOT_ENOUGH_MEMORY;
-			break;
-		}
+	//FIXME rewrite this to be more linux friendly (It appears Wine is unable to handle this code).
+	if (true) {
+		// Declare and initialize variables
+		DWORD dwRetVal = 0;
 
-		dwRetVal = GetAdaptersAddresses(family, flags, NULL, pAddresses, &outBufLen);
+		// Set the flags to pass to GetAdaptersAddresses
+		ULONG flags = GAA_FLAG_INCLUDE_PREFIX;
 
-		if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
-			HeapFree(GetProcessHeap(), 0, pAddresses);
-			pAddresses = NULL;
-		}
-		else {
-			break;
-		}
+		// IPv4
+		ULONG family = AF_INET;
 
-		Iterations++;
-		// 3 attempts max
-	} while ((dwRetVal == ERROR_BUFFER_OVERFLOW) && (Iterations < 3));
+		PIP_ADAPTER_ADDRESSES pAddresses = NULL;
+		// Allocate a 15 KB buffer to start with.
+		ULONG outBufLen = 15000;
+		ULONG Iterations = 0;
 
-	if (dwRetVal == NO_ERROR) {
-		std::vector<EligibleAdapter*> eligible_adapters;
+		PIP_ADAPTER_ADDRESSES pCurrAddresses = NULL;
+		PIP_ADAPTER_UNICAST_ADDRESS pUnicast = NULL;
 
-		// If successful, output some information from the data we received
-		pCurrAddresses = pAddresses;
-		while (pCurrAddresses) {
+		do {
+			pAddresses = (IP_ADAPTER_ADDRESSES*)HeapAlloc(GetProcessHeap(), 0, (outBufLen));
+			if (pAddresses == NULL) {
+				addDebugText("Memory allocation failed for IP_ADAPTER_ADDRESSES struct");
+				dwRetVal = ERROR_NOT_ENOUGH_MEMORY;
+				break;
+			}
 
-			if (pCurrAddresses->OperStatus == 1) {
+			dwRetVal = GetAdaptersAddresses(family, flags, NULL, pAddresses, &outBufLen);
 
-				//addDebugText("\tAdapter name: %s", pCurrAddresses->AdapterName);
+			if (dwRetVal == ERROR_BUFFER_OVERFLOW) {
+				HeapFree(GetProcessHeap(), 0, pAddresses);
+				pAddresses = NULL;
+			}
+			else {
+				break;
+			}
 
-				pUnicast = pCurrAddresses->FirstUnicastAddress;
-				
-				for (int i = 0; pUnicast != NULL; i++)
-				{
-					if (pUnicast->Address.lpSockaddr->sa_family == AF_INET)
+			Iterations++;
+			// 3 attempts max
+		} while ((dwRetVal == ERROR_BUFFER_OVERFLOW) && (Iterations < 3));
+
+		if (dwRetVal == NO_ERROR) {
+			std::vector<EligibleAdapter*> eligible_adapters;
+
+			// If successful, output some information from the data we received
+			pCurrAddresses = pAddresses;
+			while (pCurrAddresses) {
+
+				if (pCurrAddresses->OperStatus == 1) {
+
+					//addDebugText("\tAdapter name: %s", pCurrAddresses->AdapterName);
+
+					pUnicast = pCurrAddresses->FirstUnicastAddress;
+
+					for (int i = 0; pUnicast != NULL; i++)
 					{
-						sockaddr_in *sa_in = (sockaddr_in *)pUnicast->Address.lpSockaddr;
-						ULONG dwMask = 0;
-						dwRetVal = ConvertLengthToIpv4Mask(pUnicast->OnLinkPrefixLength, &dwMask);
-						if (dwRetVal == NO_ERROR) {
-							EligibleAdapter *ea = new EligibleAdapter;
-							ea->name = pCurrAddresses->AdapterName;
-							ea->unicastHAddr = ntohl(((sockaddr_in *)pUnicast->Address.lpSockaddr)->sin_addr.s_addr);
-							ea->unicastHMask = ntohl(dwMask);
-							ea->minLinkSpeed = pCurrAddresses->ReceiveLinkSpeed;
-							if (pCurrAddresses->TransmitLinkSpeed < pCurrAddresses->ReceiveLinkSpeed)
-								ea->minLinkSpeed = pCurrAddresses->TransmitLinkSpeed;
-							ea->hasDnsServer = pCurrAddresses->FirstDnsServerAddress ? TRUE : FALSE;
-							eligible_adapters.push_back(ea);
+						if (pUnicast->Address.lpSockaddr->sa_family == AF_INET)
+						{
+							sockaddr_in *sa_in = (sockaddr_in *)pUnicast->Address.lpSockaddr;
+							ULONG dwMask = 0;
+							dwRetVal = ConvertLengthToIpv4Mask(pUnicast->OnLinkPrefixLength, &dwMask);
+							if (dwRetVal == NO_ERROR) {
+								EligibleAdapter *ea = new EligibleAdapter;
+								ea->name = pCurrAddresses->AdapterName;
+								ea->unicastHAddr = ntohl(((sockaddr_in *)pUnicast->Address.lpSockaddr)->sin_addr.s_addr);
+								ea->unicastHMask = ntohl(dwMask);
+								ea->minLinkSpeed = pCurrAddresses->ReceiveLinkSpeed;
+								if (pCurrAddresses->TransmitLinkSpeed < pCurrAddresses->ReceiveLinkSpeed)
+									ea->minLinkSpeed = pCurrAddresses->TransmitLinkSpeed;
+								ea->hasDnsServer = pCurrAddresses->FirstDnsServerAddress ? TRUE : FALSE;
+								eligible_adapters.push_back(ea);
+							}
 						}
+						pUnicast = pUnicast->Next;
 					}
-					pUnicast = pUnicast->Next;
+				}
+
+				pCurrAddresses = pCurrAddresses->Next;
+			}
+
+			EligibleAdapter* chosenAdapter = NULL;
+
+			for (EligibleAdapter* ea : eligible_adapters) {
+				if (xlive_preferred_network_adapter_name && strncmp(ea->name, xlive_preferred_network_adapter_name, 50) == 0) {
+					chosenAdapter = ea;
+					break;
+				}
+				if (ea->unicastHAddr == INADDR_LOOPBACK || ea->unicastHAddr == INADDR_BROADCAST || ea->unicastHAddr == INADDR_NONE)
+					continue;
+				if (!chosenAdapter) {
+					chosenAdapter = ea;
+					continue;
+				}
+				if ((ea->hasDnsServer && !chosenAdapter->hasDnsServer) ||
+					(ea->minLinkSpeed > chosenAdapter->minLinkSpeed)) {
+					chosenAdapter = ea;
 				}
 			}
 
-			pCurrAddresses = pCurrAddresses->Next;
-		}
+			if (chosenAdapter) {
+				memcpy_s(&xlive_network_adapter, sizeof(EligibleAdapter), chosenAdapter, sizeof(EligibleAdapter));
+				xlive_network_adapter.hBroadcast = ~(xlive_network_adapter.unicastHMask) | xlive_network_adapter.unicastHAddr;
 
-		EligibleAdapter* chosenAdapter = NULL;
+				unsigned int adapter_name_buflen = strnlen_s(chosenAdapter->name, 49) + 1;
+				xlive_network_adapter.name = (char*)malloc(adapter_name_buflen);
+				memcpy_s(xlive_network_adapter.name, adapter_name_buflen, chosenAdapter->name, adapter_name_buflen);
+				xlive_network_adapter.name[adapter_name_buflen - 1] = 0;
 
-		for (EligibleAdapter* ea : eligible_adapters) {
-			if (xlive_preferred_network_adapter_name && strncmp(ea->name, xlive_preferred_network_adapter_name, 50) == 0) {
-				chosenAdapter = ea;
-				break;
+				result = ERROR_SUCCESS;
 			}
-			if (ea->unicastHAddr == INADDR_LOOPBACK || ea->unicastHAddr == INADDR_BROADCAST || ea->unicastHAddr == INADDR_NONE)
-				continue;
-			if (!chosenAdapter) {
-				chosenAdapter = ea;
-				continue;
+			else {
+				result = ERROR_NETWORK_UNREACHABLE;
 			}
-			if ((ea->hasDnsServer && !chosenAdapter->hasDnsServer) ||
-				(ea->minLinkSpeed > chosenAdapter->minLinkSpeed)) {
-				chosenAdapter = ea;
+
+			for (EligibleAdapter* ea : eligible_adapters) {
+				delete ea;
 			}
-		}
-
-		if (chosenAdapter) {
-			memcpy_s(&xlive_network_adapter, sizeof(EligibleAdapter), chosenAdapter, sizeof(EligibleAdapter));
-			xlive_network_adapter.hBroadcast = ~(xlive_network_adapter.unicastHMask) | xlive_network_adapter.unicastHAddr;
-
-			unsigned int adapter_name_buflen = strnlen_s(chosenAdapter->name, 49) + 1;
-			xlive_network_adapter.name = (char*)malloc(adapter_name_buflen);
-			memcpy_s(xlive_network_adapter.name, adapter_name_buflen, chosenAdapter->name, adapter_name_buflen);
-			xlive_network_adapter.name[adapter_name_buflen - 1] = 0;
-
-			result = ERROR_SUCCESS;
+			eligible_adapters.clear();
 		}
 		else {
-			result = ERROR_NETWORK_UNREACHABLE;
-		}
-
-		for (EligibleAdapter* ea : eligible_adapters) {
-			delete ea;
-		}
-		eligible_adapters.clear();
-	}
-	else {
-		char errorMsg[400];
-		snprintf(errorMsg, 400, "Call to GetAdaptersAddresses failed with error: %d", dwRetVal);
-		addDebugText(errorMsg);
-		if (dwRetVal == ERROR_NO_DATA)
-			addDebugText("No addresses were found for the requested parameters");
-		else {
-			LPSTR lpMsgBuf = NULL;
-			if (FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
-				FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-				NULL, dwRetVal, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-				// Default language
-				(LPSTR)&lpMsgBuf, 0, NULL)) {
-				snprintf(errorMsg, 400, "Error: %s", lpMsgBuf);
-				addDebugText(errorMsg);
-				LocalFree(lpMsgBuf);
+			char errorMsg[400];
+			snprintf(errorMsg, 400, "Call to GetAdaptersAddresses failed with error: %d", dwRetVal);
+			addDebugText(errorMsg);
+			if (dwRetVal == ERROR_NO_DATA)
+				addDebugText("No addresses were found for the requested parameters");
+			else {
+				LPSTR lpMsgBuf = NULL;
+				if (FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER |
+					FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+					NULL, dwRetVal, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+					// Default language
+					(LPSTR)&lpMsgBuf, 0, NULL)) {
+					snprintf(errorMsg, 400, "Error: %s", lpMsgBuf);
+					addDebugText(errorMsg);
+					LocalFree(lpMsgBuf);
+				}
 			}
+			result = ERROR_UNIDENTIFIED_ERROR;
 		}
-		result = ERROR_UNIDENTIFIED_ERROR;
-	}
 
-	if (pAddresses) {
-		HeapFree(GetProcessHeap(), 0, pAddresses);
+		if (pAddresses) {
+			HeapFree(GetProcessHeap(), 0, pAddresses);
+		}
+
 	}
 
 	if (result != ERROR_SUCCESS) {
+		addDebugText("ERROR: Failed to find elegible network adapter. Using Loopback Address.");
 		xlive_network_adapter.name = NULL;
 		xlive_network_adapter.unicastHAddr = INADDR_LOOPBACK;
 		xlive_network_adapter.unicastHMask = 0;
@@ -195,22 +204,38 @@ INT GetNetworkAdapter()
 	return result;
 }
 
+unsigned long LocalUserHostIpv4()
+{
+	unsigned long resolvedHostAddr;
+	EnterCriticalSection(&xlive_critsec_custom_local_user_hipv4);
+	if (xlive_custom_local_user_hipv4 != INADDR_NONE) {
+		resolvedHostAddr = xlive_custom_local_user_hipv4;
+	}
+	else {
+		resolvedHostAddr = xlive_network_adapter.unicastHAddr;
+	}
+	
+	if (resolvedHostAddr == INADDR_NONE) {
+		addDebugText("ERROR: Failed to obtain Local User IPv4 Address.");
+		resolvedHostAddr = INADDR_LOOPBACK;
+	}
+	LeaveCriticalSection(&xlive_critsec_custom_local_user_hipv4);
+	return resolvedHostAddr;
+}
+
 void CreateLocalUser()
 {
 	INT error_network_adapter = GetNetworkAdapter();
 
 	XNADDR *pAddr = &xlive_local_users[0].pxna;
 
-	unsigned long resolvedAddr;
-	if ((resolvedAddr = xlive_network_adapter.unicastHAddr) == INADDR_NONE) {//inet_addr("192.168.0.6")
-		return;
-	}
+	unsigned long resolvedHostAddr = LocalUserHostIpv4();
 
 	//DWORD user_id = 0x6061B52F;
 	DWORD user_id = rand();
 	DWORD mac_fix = 0x00131000;
 
-	pAddr->ina.s_addr = htonl(resolvedAddr);
+	pAddr->ina.s_addr = htonl(resolvedHostAddr);
 	pAddr->wPortOnline = htons(xlive_base_port);
 	pAddr->inaOnline.s_addr = user_id << 8;
 
@@ -1410,12 +1435,12 @@ DWORD WINAPI XInviteGetAcceptedInfo(DWORD dwUserIndex, XINVITE_INFO *pInfo)
 	//TODO XInviteGetAcceptedInfo
 	if (xlive_invite_to_game) {
 		xlive_invite_to_game = false;
-		unsigned long resolvedAddr;
-		if ((resolvedAddr = inet_addr("192.168.0.22")) == INADDR_NONE) {
+		unsigned long resolvedNetAddr;
+		if ((resolvedNetAddr = inet_addr("192.168.0.22")) == htonl(INADDR_NONE)) {
 			return ERROR;
 		}
 
-		pInfo->hostInfo.hostAddress.ina.s_addr = htonl(resolvedAddr);
+		pInfo->hostInfo.hostAddress.ina.s_addr = resolvedNetAddr;
 		pInfo->hostInfo.hostAddress.wPortOnline = htons(2000);
 
 		XUID host_xuid = 1234561000000032;
