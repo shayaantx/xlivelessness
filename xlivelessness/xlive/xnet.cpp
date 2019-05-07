@@ -140,8 +140,9 @@ INT WINAPI XNetXnAddrToInAddr(XNADDR *pxna, XNKID *pnkid, IN_ADDR *pina)
 		pina->s_addr = secure;
 	}
 	else {
-		__debugbreak();
+		XllnDebugBreak("ERROR XNetXnAddrToInAddr NULL inaOnline.");
 		//*pina = 0;
+		return E_UNEXPECTED;
 	}
 
 	return S_OK;
@@ -199,9 +200,11 @@ DWORD WINAPI XNetGetTitleXnAddr(XNADDR *pAddr)
 	if (!xlive_net_initialized)
 		return XNET_GET_XNADDR_PENDING;
 	if (pAddr) {
-		memcpy(pAddr, &xlive_local_users[0].pxna, sizeof(xlive_local_users[0].pxna));
+		xlive_local_users[0].pxna.ina.s_addr = htonl(LocalUserHostIpv4());
+		// test without editing local version?
+		memcpy_s(pAddr, sizeof(*pAddr), &xlive_local_users[0].pxna, sizeof(xlive_local_users[0].pxna));
 	}
-	return XNET_GET_XNADDR_STATIC | XNET_GET_XNADDR_ETHERNET;
+	return XNET_GET_XNADDR_STATIC | XNET_GET_XNADDR_ETHERNET | XNET_GET_XNADDR_ONLINE;
 }
 
 // #75

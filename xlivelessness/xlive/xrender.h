@@ -1,7 +1,8 @@
 #pragma once
+#include <atomic>
 
 extern BOOL Initialised_XRender;
-extern DWORD xlive_fps_limit;
+extern std::atomic<DWORD> xlive_fps_limit;
 INT InitXRender(XLIVE_INITIALIZE_INFO* pPii);
 INT UninitXRender();
-VOID SetFPSLimit(DWORD fps_limit);
+DWORD SetFPSLimit(DWORD fps_limit);

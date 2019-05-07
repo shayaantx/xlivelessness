@@ -15,7 +15,8 @@ static BOOL xlive_xlocator_initialized = FALSE;
 #pragma pack(push) // Save current alignment setting.
 #pragma pack(1) // Specify single-byte alignment.
 typedef struct {
-	DWORD padding1;
+	BYTE bSentinel;
+	BYTE bCustomPacketType;
 	XUID xuid;
 	DWORD dwServerType;
 	XNKID xnkid;
@@ -31,6 +32,8 @@ typedef struct {
 
 CRITICAL_SECTION xlive_xlocator_enumerators_lock;
 std::map<HANDLE, std::vector<std::pair<DWORD, WORD>>> xlive_xlocator_enumerators;
+std::atomic<bool> xlln_xlocator_custom_live = FALSE;
+std::atomic<bool> xlln_xlocator_custom_lan = FALSE;
 
 std::map<std::pair<DWORD, WORD>, XLOCATOR_SESSION*> liveoverlan_sessions;
 CRITICAL_SECTION liveoverlan_sessions_lock;
@@ -87,29 +90,32 @@ VOID LiveOverLanDelete(XLOCATOR_SEARCHRESULT *xlocator_result)
 
 static VOID LiveOverLanBroadcast()
 {
-	std::mutex mymutex;
+	std::mutex mutexPause;
 	while (1) {
 		EnterCriticalSection(&liveoverlan_broadcast_lock);
 		if (local_session_details) {
 			// Broadcast.
-			addDebugText("LiveOverLan Broadcast");
+			addDebugText("LiveOverLan Advertise Broadcast.");
+
+			if (!xlive_liveoverlan_socket) {
+				XllnDebugBreak("xlive_liveoverlan_socket never got initialized!");
+			}
 
 			SOCKADDR_IN SendStruct;
 			SendStruct.sin_port = htons(1001);
-			SendStruct.sin_addr.s_addr = INADDR_BROADCAST;
+			SendStruct.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 			SendStruct.sin_family = AF_INET;
 
-			if (!xlive_liveoverlan_socket)
-				XllnDebugBreak("xlive_liveoverlan_socket never got initialized!");
-
-			XSocketSendTo(xlive_liveoverlan_socket, (char*)local_session_details, local_session_details->pProperties + sizeof(LIVE_SERVER_DETAILS), 0, (SOCKADDR*)&SendStruct, sizeof(SendStruct));
+			XllnSocketSendTo(xlive_liveoverlan_socket, (char*)local_session_details, local_session_details->pProperties + sizeof(LIVE_SERVER_DETAILS), 0, (SOCKADDR*)&SendStruct, sizeof(SendStruct));
 
 		}
 		LeaveCriticalSection(&liveoverlan_broadcast_lock);
-		std::unique_lock<std::mutex> lock(mymutex);
+
+		std::unique_lock<std::mutex> lock(mutexPause);
 		liveoverlan_cond_broadcast.wait_for(lock, std::chrono::seconds(10), []() { return liveoverlan_exit == TRUE || liveoverlan_break_sleep == TRUE; });
-		if (liveoverlan_exit)
+		if (liveoverlan_exit) {
 			break;
+		}
 		liveoverlan_break_sleep = FALSE;
 	}
 }
@@ -433,7 +439,8 @@ static VOID LiveOverLanBroadcastData(XUID *xuid,
 		}
 	}
 
-	new_local_sd->padding1 = 0x01230123;
+	new_local_sd->bSentinel = XLLN_CUSTOM_PACKET_SENTINEL;
+	new_local_sd->bCustomPacketType = XLLNCustomPacketType::LIVE_OVER_LAN_ADVERTISE;
 
 	EnterCriticalSection(&liveoverlan_broadcast_lock);
 	if (local_session_details)
@@ -441,23 +448,34 @@ static VOID LiveOverLanBroadcastData(XUID *xuid,
 	local_session_details = new_local_sd;
 	LeaveCriticalSection(&liveoverlan_broadcast_lock);
 }
-BYTE LiveOverLanRecieve(const std::pair<DWORD, WORD> hostpair, char* buf, INT& result)
+VOID LiveOverLanRecieve(SOCKET socket, sockaddr *to, int tolen, const std::pair<DWORD, WORD> hostpair, char *buf, INT &len)
 {
-	if (result == sizeof(DWORD) + sizeof(XUID) && *((DWORD*)&buf[0]) == 0x01230124) {
-		XUID &hostXuid = *((XUID*)&buf[4]);
+	const int headerLen = sizeof(XLLN_CUSTOM_PACKET_SENTINEL) + sizeof(XLLNCustomPacketType::Type);
+	const LIVE_SERVER_DETAILS *session_details = (const LIVE_SERVER_DETAILS*)buf;
+	if (buf[sizeof(XLLN_CUSTOM_PACKET_SENTINEL)] == XLLNCustomPacketType::LIVE_OVER_LAN_UNADVERTISE) {
+		if (len != headerLen + sizeof(session_details->xuid)) {
+			addDebugText("LiveOverLAN: ERROR Received INVALID Broadcast Unadvertise.");
+			return;
+		}
+		const XUID &unregisterXuid = session_details->xuid;// Unused (also struct only valid/filled until here).
 		addDebugText("Received Broadcast Unadvertise");
 		EnterCriticalSection(&liveoverlan_sessions_lock);
 		liveoverlan_sessions.erase(hostpair);
 		LeaveCriticalSection(&liveoverlan_sessions_lock);
-		return 1;
 	}
-	else if (result >= sizeof(XNADDR) + 8 && ((DWORD*)&buf[0])[0] == 0x01230123) {
+	else {
+		// It can be larger than this.
+		if (len < sizeof(*session_details)) {
+			addDebugText("LiveOverLAN: ERROR Received INVALID Broadcast Advertise.");
+			return;
+		}
+
 		XLOCATOR_SEARCHRESULT *searchresult = 0;
 		if (!xlive_users_hostpair.count(hostpair)) {
 			addDebugText("Received Broadcast - NO USER");
-			result = 0;
+			SendUnknownUserAskRequest(socket, buf, len, to, tolen);
 		}
-		else if (LiveOverLanBroadcastReceive(&searchresult, (BYTE*)buf, result)) {
+		else if (LiveOverLanBroadcastReceive(&searchresult, (BYTE*)buf, len)) {
 			addDebugText("Received Broadcast");
 			EnterCriticalSection(&liveoverlan_sessions_lock);
 			if (liveoverlan_sessions.count(hostpair)) {
@@ -475,11 +493,11 @@ BYTE LiveOverLanRecieve(const std::pair<DWORD, WORD> hostpair, char* buf, INT& r
 			newsession->broadcastTime = (unsigned long)ltime;
 			liveoverlan_sessions[hostpair] = newsession;
 			LeaveCriticalSection(&liveoverlan_sessions_lock);
-			return 1;
 		}
-		return 2;
+		else {
+			addDebugText("LiveOverLAN: ERROR Parsing Received Broadcast Advertise.");
+		}
 	}
-	return FALSE;
 }
 static VOID LiveOverLanStartBroadcast()
 {
@@ -653,20 +671,24 @@ HRESULT WINAPI XLocatorServerUnAdvertise(DWORD dwUserIndex, PXOVERLAPPED pXOverl
 
 	LiveOverLanStopBroadcast();
 
+	const DWORD buflen = sizeof(XLLN_CUSTOM_PACKET_SENTINEL) + sizeof(XLLNCustomPacketType::Type) + sizeof(XUID);
+	BYTE unadvertiseData[buflen];
+	unadvertiseData[0] = XLLN_CUSTOM_PACKET_SENTINEL;
+	unadvertiseData[sizeof(XLLN_CUSTOM_PACKET_SENTINEL)] = XLLNCustomPacketType::LIVE_OVER_LAN_UNADVERTISE;
+	*((XUID*)&unadvertiseData[sizeof(XLLN_CUSTOM_PACKET_SENTINEL) + sizeof(XLLNCustomPacketType::Type)]) = xlive_users_info[dwUserIndex]->xuid;
+
+	addDebugText("LiveOverLan Unadvertise Broadcast.");
+
+	if (!xlive_liveoverlan_socket) {
+		XllnDebugBreak("xlive_liveoverlan_socket never got initialized!");
+	}
+
 	SOCKADDR_IN SendStruct;
 	SendStruct.sin_port = htons(1001);
-	SendStruct.sin_addr.s_addr = INADDR_BROADCAST;
+	SendStruct.sin_addr.s_addr = htonl(INADDR_BROADCAST);
 	SendStruct.sin_family = AF_INET;
 
-	const DWORD buflen = sizeof(DWORD) + sizeof(XUID);
-	BYTE unadvertiseData[buflen];
-	*((DWORD*)&unadvertiseData[0]) = 0x01230124;
-	*((XUID*)&unadvertiseData[4]) = xlive_users_info[dwUserIndex]->xuid;
-
-	if (!xlive_liveoverlan_socket)
-		XllnDebugBreak("xlive_liveoverlan_socket never got initialized!");
-
-	XSocketSendTo(xlive_liveoverlan_socket, (char*)unadvertiseData, buflen, 0, (SOCKADDR*)&SendStruct, sizeof(SendStruct));
+	XllnSocketSendTo(xlive_liveoverlan_socket, (char*)unadvertiseData, buflen, 0, (SOCKADDR*)&SendStruct, sizeof(SendStruct));
 
 	if (pXOverlapped) {
 		//asynchronous

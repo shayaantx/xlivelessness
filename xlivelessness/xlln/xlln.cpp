@@ -166,22 +166,61 @@ DWORD WINAPI XLLNLogout(DWORD dwUserIndex)
 	return ERROR_SUCCESS;
 }
 
+namespace XLLNModifyPropertyType {
+	enum Type : DWORD {
+		UNKNOWN = 0,
+		FPS_LIMIT,
+		CUSTOM_LOCAL_USER_hIPv4,
+	};
+}
+
 // #41142
-DWORD WINAPI XLLNModifyProperty(DWORD propertyId, DWORD *newValue, DWORD *oldValue)
+DWORD WINAPI XLLNModifyProperty(XLLNModifyPropertyType::Type propertyId, DWORD *newValue, DWORD *oldValue)
 {
 	TRACE_FX();
-	if (!propertyId)
-		return ERROR_INVALID_PARAMETER;
-	if (!newValue && !oldValue)
+	if (propertyId == XLLNModifyPropertyType::UNKNOWN)
 		return ERROR_INVALID_PARAMETER;
 
-	if (propertyId == 1) {
-		if (oldValue) {
+	if (propertyId == XLLNModifyPropertyType::FPS_LIMIT) {
+		if (oldValue && !newValue) {
 			*oldValue = xlive_fps_limit;
 		}
-		if (newValue) {
-			SetFPSLimit(*newValue);
+		else if (newValue) {
+			DWORD old_value = SetFPSLimit(*newValue);
+			if (oldValue) {
+				*oldValue = old_value;
+			}
 		}
+		else {
+			return ERROR_NOT_SUPPORTED;
+		}
+	}
+	else if (propertyId == XLLNModifyPropertyType::CUSTOM_LOCAL_USER_hIPv4) {
+		EnterCriticalSection(&xlive_critsec_custom_local_user_hipv4);
+		if (newValue && *newValue == INADDR_NONE) {
+			LeaveCriticalSection(&xlive_critsec_custom_local_user_hipv4);
+			return ERROR_INVALID_PARAMETER;
+		}
+		if (!newValue && !oldValue) {
+			if (xlive_custom_local_user_hipv4 == INADDR_NONE) {
+				LeaveCriticalSection(&xlive_critsec_custom_local_user_hipv4);
+				return ERROR_NOT_FOUND;
+			}
+			xlive_custom_local_user_hipv4 = INADDR_NONE;
+			LeaveCriticalSection(&xlive_critsec_custom_local_user_hipv4);
+			return ERROR_SUCCESS;
+		}
+		if (newValue && !oldValue && xlive_custom_local_user_hipv4 != INADDR_NONE) {
+			LeaveCriticalSection(&xlive_critsec_custom_local_user_hipv4);
+			return ERROR_ALREADY_REGISTERED;
+		}
+		if (oldValue) {
+			*oldValue = xlive_custom_local_user_hipv4;
+		}
+		if (newValue) {
+			xlive_custom_local_user_hipv4 = *newValue;
+		}
+		LeaveCriticalSection(&xlive_critsec_custom_local_user_hipv4);
 	}
 	else {
 		return ERROR_UNKNOWN_PROPERTY;
@@ -400,6 +439,8 @@ INT InitXLLN(HMODULE hModule)
 		Sleep(500L);
 	}
 
+	InitializeCriticalSection(&xlive_critsec_custom_local_user_hipv4);
+
 	wchar_t mutex_name[40];
 	DWORD mutex_last_error;
 	HANDLE mutex = NULL;
@@ -424,5 +465,6 @@ INT InitXLLN(HMODULE hModule)
 
 INT UninitXLLN()
 {
+	DeleteCriticalSection(&xlive_critsec_custom_local_user_hipv4);
 	return 0;
 }

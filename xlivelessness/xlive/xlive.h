@@ -26,4 +26,8 @@ HRESULT _stdcall XLiveSetDebugLevel(
 	XLIVE_DEBUG_LEVEL *pxdlOldLevel
 );
 
+extern CRITICAL_SECTION xlive_critsec_custom_local_user_hipv4;
+extern unsigned long xlive_custom_local_user_hipv4;
 extern BOOL xlive_online_initialized;
+
+unsigned long LocalUserHostIpv4();
